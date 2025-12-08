@@ -14,11 +14,11 @@
 }
 
 :root[data-theme='dark'] {
-  --bg: #0b1220;
+  --bg: #05070f;
   --panel: #0f172a;
   --border: #1f2937;
   --accent: #38bdf8;
-  --accent-soft: rgba(56, 189, 248, 0.15);
+  --accent-soft: rgba(56, 189, 248, 0.16);
   --muted: #cbd5e1;
   color-scheme: dark;
 }
@@ -39,9 +39,9 @@ body {
 }
 
 [data-theme='dark'] body {
-  background: radial-gradient(circle at 10% 20%, rgba(56, 189, 248, 0.12), transparent 25%),
-    radial-gradient(circle at 90% 10%, rgba(14, 165, 233, 0.12), transparent 26%),
-    linear-gradient(120deg, rgba(255, 255, 255, 0.02) 0%, rgba(255, 255, 255, 0.02) 30%, transparent 30%),
+  background: radial-gradient(circle at 10% 20%, rgba(56, 189, 248, 0.08), transparent 24%),
+    radial-gradient(circle at 90% 10%, rgba(14, 165, 233, 0.08), transparent 24%),
+    linear-gradient(120deg, rgba(255, 255, 255, 0.015) 0%, rgba(255, 255, 255, 0.015) 30%, transparent 30%),
     var(--bg);
   color: #e2e8f0;
 }
@@ -103,8 +103,8 @@ h6 {
 
 [data-theme='dark'] .bg-aurora {
   background: radial-gradient(circle at 20% 20%, rgba(56, 189, 248, 0.12), transparent 26%),
-    radial-gradient(circle at 80% 0%, rgba(14, 165, 233, 0.14), transparent 24%),
-    radial-gradient(circle at 50% 80%, rgba(14, 165, 233, 0.12), transparent 25%),
+    radial-gradient(circle at 80% 0%, rgba(14, 165, 233, 0.12), transparent 24%),
+    radial-gradient(circle at 50% 80%, rgba(14, 165, 233, 0.1), transparent 25%),
     var(--bg);
 }
 
