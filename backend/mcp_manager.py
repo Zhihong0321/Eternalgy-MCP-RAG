@@ -2,6 +2,8 @@ import asyncio
 import os
 import logging
 import traceback
+from datetime import datetime, timezone
+from typing import Dict, Any, Optional
 
 from mcp.client.stdio import stdio_client
 from mcp.client.session import ClientSession
@@ -12,19 +14,33 @@ logger = logging.getLogger(__name__)
 
 class MCPManager:
     def __init__(self):
-        self.server_configs = {} # Stores StdioServerParameters objects
+        self.server_configs: Dict[str, StdioServerParameters] = {}
+        self.server_states: Dict[str, Dict[str, Any]] = {} # mcp_id -> {status, last_heartbeat, last_error, ...}
+        self.default_timeout = 30 # seconds
 
-    async def spawn_mcp(self, mcp_id: str, command: str, args: list[str], cwd: str = "/app") -> dict:
+    async def spawn_mcp(self, mcp_id: str, command: str, args: list[str], cwd: str = "/app", env: dict = None) -> dict:
         """
-        Registers an MCP server configuration. The actual process is spawned per call.
+        Registers an MCP server configuration.
         """
         logger.info(f"Registering MCP {mcp_id} config: command={command}, args={args}, cwd={cwd}")
+        
+        # Merge with current env but let provided env override
+        full_env = os.environ.copy()
+        if env:
+            full_env.update(env)
+
         server_params = StdioServerParameters(
             command=command,
             args=args,
-            cwd=cwd
+            cwd=cwd,
+            env=full_env
         )
         self.server_configs[mcp_id] = server_params
+        self.server_states[mcp_id] = {
+            "status": "registered",
+            "last_heartbeat": None,
+            "last_error": None
+        }
         
         logger.info(f"MCP config {mcp_id} registered successfully.")
         return {"mcp_id": mcp_id, "status": "registered"}
@@ -36,16 +52,16 @@ class MCPManager:
         if mcp_id in self.server_configs:
             logger.info(f"Removing MCP config {mcp_id}.")
             del self.server_configs[mcp_id]
+            if mcp_id in self.server_states:
+                del self.server_states[mcp_id]
         else:
             logger.warning(f"Attempted to terminate non-existent MCP config: {mcp_id}")
 
-    async def get_mcp_status(self, mcp_id: str) -> str:
+    async def get_mcp_status(self, mcp_id: str) -> dict:
         """
-        Gets the status of an MCP server.
+        Gets the detailed status of an MCP server.
         """
-        if mcp_id in self.server_configs:
-            return "registered (inactive)"
-        return "not found"
+        return self.server_states.get(mcp_id, {"status": "not found"})
 
     async def list_mcp_tools(self, mcp_id: str) -> list[Tool]:
         """
@@ -55,16 +71,28 @@ class MCPManager:
         if not server_params:
             raise ValueError(f"MCP config for {mcp_id} not found. Register it first.")
         
+        self.server_states[mcp_id]["status"] = "listing_tools"
         logger.info(f"Spawning temporary process to list tools for MCP {mcp_id}")
+        
         try:
             async with stdio_client(server_params) as (read, write):
                 async with ClientSession(read, write) as session:
-                    await session.initialize()
-                    tools_data = await session.list_tools()
+                    await asyncio.wait_for(session.initialize(), timeout=10)
+                    tools_data = await asyncio.wait_for(session.list_tools(), timeout=self.default_timeout)
+                    
+                    # Update state
+                    self.server_states[mcp_id]["status"] = "active"
+                    self.server_states[mcp_id]["last_heartbeat"] = datetime.now(timezone.utc).isoformat()
+                    self.server_states[mcp_id]["last_error"] = None
+                    
                     return tools_data.tools 
         except Exception as e:
-            logger.error(f"Error listing tools for MCP {mcp_id}: {e}")
+            error_msg = f"Error listing tools for MCP {mcp_id}: {str(e)}"
+            logger.error(error_msg)
             logger.error(traceback.format_exc())
+            
+            self.server_states[mcp_id]["status"] = "error"
+            self.server_states[mcp_id]["last_error"] = str(e)
             raise e
 
     async def call_mcp_tool(self, mcp_id: str, tool_name: str, tool_args: dict) -> dict:
@@ -75,16 +103,28 @@ class MCPManager:
         if not server_params:
             raise ValueError(f"MCP config for {mcp_id} not found. Register it first.")
         
+        self.server_states[mcp_id]["status"] = f"running_tool:{tool_name}"
         logger.info(f"Spawning temporary process to call tool '{tool_name}' on MCP {mcp_id} with args: {tool_args}")
+        
         try:
             async with stdio_client(server_params) as (read, write):
                 async with ClientSession(read, write) as session:
-                    await session.initialize()
-                    result = await session.call_tool(tool_name, arguments=tool_args)
+                    await asyncio.wait_for(session.initialize(), timeout=10)
+                    result = await asyncio.wait_for(session.call_tool(tool_name, arguments=tool_args), timeout=self.default_timeout)
+                    
+                    # Update state
+                    self.server_states[mcp_id]["status"] = "active"
+                    self.server_states[mcp_id]["last_heartbeat"] = datetime.now(timezone.utc).isoformat()
+                    self.server_states[mcp_id]["last_error"] = None
+                    
                     return result
         except Exception as e:
-            logger.error(f"Error calling tool {tool_name} on MCP {mcp_id}: {e}")
+            error_msg = f"Error calling tool {tool_name} on MCP {mcp_id}: {str(e)}"
+            logger.error(error_msg)
             logger.error(traceback.format_exc())
+            
+            self.server_states[mcp_id]["status"] = "error"
+            self.server_states[mcp_id]["last_error"] = str(e)
             raise e
 
     async def shutdown_all_mcps(self):

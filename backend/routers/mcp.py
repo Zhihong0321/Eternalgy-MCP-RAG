@@ -3,21 +3,58 @@ from sqlmodel import Session, select
 from typing import List
 import shutil
 import os
+import hashlib
+import json
+import logging
 
 from database import get_session
 from models import MCPServer
 from dependencies import get_mcp_manager
 from mcp_manager import MCPManager
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/api/v1/mcp", tags=["MCP Management"])
 
 @router.get("/servers", response_model=List[MCPServer])
-def list_mcp_servers(session: Session = Depends(get_session)):
+async def list_mcp_servers(session: Session = Depends(get_session), mcp_manager: MCPManager = Depends(get_mcp_manager)):
     servers = session.exec(select(MCPServer)).all()
+    scripts_dir = os.getenv("MCP_SCRIPTS_DIR", "/app/scripts")
+    
+    # Enrich with runtime status if available
+    for server in servers:
+        status_info = await mcp_manager.get_mcp_status(str(server.id))
+        
+        # Check script existence
+        script_path = os.path.join(scripts_dir, os.path.basename(server.script))
+        script_exists = os.path.exists(script_path)
+
+        if status_info.get("status") != "not found":
+             server.status = status_info.get("status")
+             server.last_heartbeat = status_info.get("last_heartbeat")
+             server.last_error = status_info.get("last_error")
+        else:
+             # Not running, check if script is missing
+             if not script_exists:
+                 server.status = "missing_script"
+             else:
+                 server.status = "ready" # Ready to start
+
     return servers
 
 @router.post("/servers", response_model=MCPServer)
 def create_mcp_server(server: MCPServer, session: Session = Depends(get_session)):
+    # Validate env_vars and args are valid JSON
+    try:
+        json.loads(server.env_vars)
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=400, detail="env_vars must be a valid JSON string")
+    
+    try:
+        json.loads(server.args)
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=400, detail="args must be a valid JSON string")
+
     session.add(server)
     session.commit()
     session.refresh(server)
@@ -41,19 +78,48 @@ async def start_mcp_server(server_id: int, session: Session = Depends(get_sessio
     server = session.get(MCPServer, server_id)
     if not server:
         raise HTTPException(status_code=404, detail="Server not found")
+
+    scripts_dir = os.getenv("MCP_SCRIPTS_DIR", "/app/scripts")
+    script_filename = os.path.basename(server.script)
+    script_path = os.path.join(scripts_dir, script_filename)
+
+    if not os.path.exists(script_path):
+         raise HTTPException(status_code=404, detail=f"Script file not found: {script_filename}")
     
-    # Parse args from string if stored as JSON string, or assume simple list
-    # For now, assuming 'script' is the filename and we run with python
-    # In a real app, 'script' might be the full command or we parse 'env_vars'
-    
-    # We'll assume standard python script execution for now
-    command = "python"
-    args = [server.script] 
-    
+    # Parse env_vars
     try:
-        result = await mcp_manager.spawn_mcp(str(server_id), command, args)
+        env_vars = json.loads(server.env_vars) if server.env_vars else {}
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=400, detail="Invalid JSON in env_vars")
+
+    # Parse args
+    try:
+        args = json.loads(server.args) if server.args else []
+        if not isinstance(args, list):
+             # Fallback if it was just a string in old db
+             args = [server.script]
+    except json.JSONDecodeError:
+        # Fallback
+        args = [server.script]
+    
+    # If args is empty, default to [script_path] (absolute path)
+    if not args and server.script:
+        args = [script_path]
+    elif args and args[0] == server.script:
+        # If the first arg is just the filename, replace with absolute path to be safe
+        args[0] = script_path
+
+    try:
+        result = await mcp_manager.spawn_mcp(
+            mcp_id=str(server_id), 
+            command=server.command, 
+            args=args, 
+            cwd=server.cwd,
+            env=env_vars
+        )
         return result
     except Exception as e:
+        logger.error(f"Failed to start MCP {server_id}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/servers/{server_id}/stop")
@@ -64,7 +130,7 @@ async def stop_mcp_server(server_id: int, mcp_manager: MCPManager = Depends(get_
 @router.get("/servers/{server_id}/status")
 async def mcp_server_status(server_id: int, mcp_manager: MCPManager = Depends(get_mcp_manager)):
     status = await mcp_manager.get_mcp_status(str(server_id))
-    return {"status": status}
+    return status
 
 @router.get("/servers/{server_id}/tools")
 async def mcp_server_tools(server_id: int, mcp_manager: MCPManager = Depends(get_mcp_manager)):
@@ -84,11 +150,44 @@ async def call_mcp_server_tool(server_id: int, tool_name: str, tool_args: dict, 
 
 @router.post("/upload")
 async def upload_mcp_script(file: UploadFile = File(...)):
-    upload_dir = "/app/scripts"
+    # 1. Validation
+    if not file.filename.endswith(".py"):
+        raise HTTPException(status_code=400, detail="Only .py files are allowed.")
+    
+    # 2. Path Traversal Prevention
+    filename = os.path.basename(file.filename)
+    if not filename:
+        raise HTTPException(status_code=400, detail="Invalid filename")
+
+    upload_dir = os.getenv("MCP_UPLOAD_DIR", os.getenv("MCP_SCRIPTS_DIR", "/app/scripts"))
     os.makedirs(upload_dir, exist_ok=True)
-    file_path = os.path.join(upload_dir, file.filename)
+    file_path = os.path.join(upload_dir, filename)
+    
+    # 3. Size Limit & Checksum
+    MAX_SIZE = 10 * 1024 * 1024 # 10MB
+    sha256_hash = hashlib.sha256()
+    size = 0
     
     with open(file_path, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
+        while True:
+            chunk = await file.read(4096)
+            if not chunk:
+                break
+            size += len(chunk)
+            if size > MAX_SIZE:
+                # Cleanup
+                buffer.close()
+                os.remove(file_path)
+                raise HTTPException(status_code=400, detail="File too large (max 10MB)")
+            
+            sha256_hash.update(chunk)
+            buffer.write(chunk)
+            
+    checksum = sha256_hash.hexdigest()
         
-    return {"filename": file.filename, "path": file_path}
+    return {
+        "filename": filename, 
+        "path": file_path, 
+        "size_bytes": size, 
+        "checksum": checksum
+    }

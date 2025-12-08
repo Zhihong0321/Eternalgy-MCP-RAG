@@ -1,13 +1,15 @@
 import os
+import shutil
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from sqlmodel import SQLModel, text
+from sqlmodel import SQLModel, text, Session
 from sqlalchemy.exc import OperationalError
 import logging
 
 from database import engine
-from dependencies import mcp_manager # Use the shared instance
-from routers import mcp, chat, agents
+from dependencies import mcp_manager, zai_client
+from routers import mcp, chat, agents, websocket_chat, settings
+from models import SystemSetting
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -26,6 +28,8 @@ app = FastAPI(
 app.include_router(mcp.router)
 app.include_router(chat.router)
 app.include_router(agents.router)
+app.include_router(websocket_chat.router)
+app.include_router(settings.router)
 
 # Set up CORS
 origins = ["http://localhost:8080"]
@@ -39,13 +43,45 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Initialize ZaiClient globally (Moved to dependencies.py)
-# zai_client = ZaiClient(api_key=os.getenv("ZAI_API_KEY"))
-
+def seed_mcp_scripts():
+    """Seeds initial MCP scripts to the persistent volume if missing."""
+    scripts_dir = os.getenv("MCP_SCRIPTS_DIR", "/app/scripts")
+    initial_dir = "/app/initial_mcp_servers"
+    
+    # Create target dir if it doesn't exist (it should be a volume, but just in case)
+    os.makedirs(scripts_dir, exist_ok=True)
+    
+    if os.path.exists(initial_dir):
+        logger.info(f"Seeding MCP scripts from {initial_dir} to {scripts_dir}...")
+        for filename in os.listdir(initial_dir):
+            if filename.endswith(".py"):
+                src = os.path.join(initial_dir, filename)
+                dst = os.path.join(scripts_dir, filename)
+                
+                if not os.path.exists(dst):
+                    try:
+                        shutil.copy2(src, dst)
+                        logger.info(f"Seeded {filename}")
+                    except Exception as e:
+                        logger.error(f"Failed to seed {filename}: {e}")
+                else:
+                    logger.debug(f"{filename} already exists, skipping.")
+    else:
+        logger.warning(f"Initial MCP directory {initial_dir} not found. Skipping seeding.")
 
 @app.on_event("startup")
 async def on_startup():
     create_db_and_tables()
+    seed_mcp_scripts()
+    # Load Z.ai Key from DB if exists
+    try:
+        with Session(engine) as session:
+            setting = session.get(SystemSetting, "zai_api_key")
+            if setting and setting.value:
+                logger.info("Loading Z.ai API Key from Database...")
+                zai_client.update_api_key(setting.value)
+    except Exception as e:
+        logger.warning(f"Failed to load Z.ai key from DB on startup: {e}")
 
 @app.on_event("shutdown")
 async def on_shutdown():

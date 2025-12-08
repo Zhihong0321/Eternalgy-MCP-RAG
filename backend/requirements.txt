@@ -7,3 +7,9 @@ alembic
 httpx
 openai
 mcp
+tenacity
+redis
+pytest
+pytest-asyncio
+
+

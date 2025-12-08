@@ -11,6 +11,15 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy the rest of the application code
 COPY . .
 
+# Copy initial MCP servers (these will be seeded to the volume on startup)
+COPY mcp_servers /app/initial_mcp_servers
+
+# Create a non-root user and switch to it
+RUN useradd -m -u 1000 appuser && \
+    chown -R appuser:appuser /app
+
+USER appuser
+
 # Expose the port the app runs on
 EXPOSE 8000
 

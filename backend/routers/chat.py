@@ -3,6 +3,7 @@ from sqlmodel import Session, select
 from typing import List, Dict, Any
 import json
 import logging
+from openai import RateLimitError
 
 from database import get_session
 from models import Agent, AgentMCPServer, ChatRequest, ChatResponse, MCPServer, AgentKnowledgeFile
@@ -52,12 +53,30 @@ async def chat_with_agent(
             if mcp_server_db:
                 # Check if registered
                 status = await mcp_manager.get_mcp_status(str(server_id))
-                if status == "not found":
+                if status.get("status") == "not found":
                      # Register it
+                     env_vars = {}
+                     if mcp_server_db.env_vars:
+                         try:
+                             env_vars = json.loads(mcp_server_db.env_vars)
+                         except:
+                             pass
+                    
+                     args = []
+                     if mcp_server_db.args:
+                         try:
+                             args = json.loads(mcp_server_db.args)
+                         except:
+                             pass
+                     if not args and mcp_server_db.command == "python":
+                         args = [mcp_server_db.script]
+
                      await mcp_manager.spawn_mcp(
                          str(server_id), 
-                         "python", 
-                         [mcp_server_db.script]
+                         mcp_server_db.command, 
+                         args,
+                         cwd=mcp_server_db.cwd,
+                         env=env_vars
                      )
 
             server_tools = await mcp_manager.list_mcp_tools(str(server_id))
@@ -90,11 +109,15 @@ async def chat_with_agent(
     for _ in range(max_turns):
         # Call Z.ai
         try:
-            message = zai_client.chat(
+            message = await zai_client.chat(
                 messages=messages,
                 model=agent.model,
-                tools=tools if tools else None
+                tools=tools if tools else None,
+                include_reasoning=request.include_reasoning
             )
+        except RateLimitError:
+            logger.error("Z.ai Rate Limit Exceeded")
+            raise HTTPException(status_code=429, detail="Z.ai API Rate Limit Exceeded. Please try again later.")
         except Exception as e:
              raise HTTPException(status_code=500, detail=f"Z.ai Error: {str(e)}")
 

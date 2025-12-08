@@ -1,11 +1,9 @@
 version: '3.8'
 services:
   frontend:
-    image: nginx:alpine
+    build: ./frontend
     ports:
-      - "8080:80"
-    volumes:
-      - ./frontend/static:/usr/share/nginx/html
+      - "8080:8080"
     depends_on:
       - backend
   backend:
@@ -15,8 +13,14 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      redis:
+        condition: service_started
     env_file:
       - ./backend/.env
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+    volumes:
+      - mcp_scripts:/app/scripts
   db:
     image: postgres:15
     restart: always
@@ -33,6 +37,11 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+  redis:
+    image: redis:alpine
+    ports:
+      - "6379:6379"
 
 volumes:
   postgres_data:
+  mcp_scripts:
