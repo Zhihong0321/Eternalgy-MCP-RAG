@@ -150,9 +150,14 @@ async def call_mcp_server_tool(server_id: int, tool_name: str, tool_args: dict, 
 
 @router.post("/upload")
 async def upload_mcp_script(file: UploadFile = File(...)):
+    """
+    Upload an MCP asset (server script or data). Allows .py and .json so data
+    files like bill.json can ship alongside the server script.
+    """
     # 1. Validation
-    if not file.filename.endswith(".py"):
-        raise HTTPException(status_code=400, detail="Only .py files are allowed.")
+    allowed_exts = (".py", ".json")
+    if not any(file.filename.endswith(ext) for ext in allowed_exts):
+        raise HTTPException(status_code=400, detail="Only .py or .json files are allowed.")
     
     # 2. Path Traversal Prevention
     filename = os.path.basename(file.filename)
@@ -175,7 +180,6 @@ async def upload_mcp_script(file: UploadFile = File(...)):
                 break
             size += len(chunk)
             if size > MAX_SIZE:
-                # Cleanup
                 buffer.close()
                 os.remove(file_path)
                 raise HTTPException(status_code=400, detail="File too large (max 10MB)")
