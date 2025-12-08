@@ -3,7 +3,7 @@ import { computed, onMounted, ref } from 'vue'
 import TuiBadge from '../components/ui/TuiBadge.vue'
 import TuiButton from '../components/ui/TuiButton.vue'
 
-const BASE_URL = 'http://localhost:8001/api/v1'
+const API_BASE = `${window.location.origin}/api/v1`
 
 const agents = ref([])
 const threads = ref([])
@@ -38,7 +38,7 @@ const loadAgents = async () => {
   isLoadingAgents.value = true
   agentError.value = ''
   try {
-    const res = await fetch(`${BASE_URL}/agents/`)
+    const res = await fetch(`${API_BASE}/agents/`)
     if (!res.ok) throw new Error('Failed to fetch agents')
     const data = await res.json()
     agents.value = Array.isArray(data)
@@ -64,7 +64,7 @@ const loadThreads = async () => {
   isLoadingThreads.value = true
   threadError.value = ''
   try {
-    const res = await fetch(`${BASE_URL}/threads?limit=10&status=active`)
+    const res = await fetch(`${API_BASE}/threads?limit=10&status=active`)
     if (!res.ok) throw new Error('Failed to fetch threads')
     const data = await res.json()
     threads.value = Array.isArray(data)
@@ -105,7 +105,7 @@ onMounted(() => {
             </p>
             <div class="flex flex-wrap items-center gap-2">
               <TuiBadge variant="info">/api/v1</TuiBadge>
-              <TuiBadge variant="muted">base: localhost:8001</TuiBadge>
+            <TuiBadge variant="muted">base: dynamic (current host)</TuiBadge>
             </div>
           </div>
           <div class="flex flex-wrap items-center gap-3">
@@ -153,7 +153,7 @@ onMounted(() => {
             <span class="text-3xl font-bold text-slate-900">/api</span>
             <span class="text-sm text-slate-600">v1</span>
           </div>
-          <p class="mt-1 text-xs text-slate-600">localhost:8001</p>
+          <p class="mt-1 text-xs text-slate-600">Uses current host for API calls.</p>
         </div>
       </section>
 
@@ -258,7 +258,7 @@ onMounted(() => {
             <div class="mt-4 space-y-3 text-sm text-slate-700">
               <p class="flex items-center gap-2">
                 <span class="h-2 w-2 rounded-full bg-slate-900"></span>
-                Dashboard is wired to backend at localhost:8001.
+                Dashboard is wired to the current host (no localhost hardcoding).
               </p>
               <p class="flex items-center gap-2">
                 <span class="h-2 w-2 rounded-full bg-slate-500"></span>
