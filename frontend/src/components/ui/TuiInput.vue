@@ -5,8 +5,22 @@ const props = defineProps({
   placeholder: {
     type: String,
     default: ''
+  },
+  modelValue: {
+    type: [String, Number],
+    default: ''
+  },
+  type: {
+    type: String,
+    default: 'text'
   }
 })
+
+const emit = defineEmits(['update:modelValue'])
+
+const onInput = (event) => {
+  emit('update:modelValue', event.target.value)
+}
 </script>
 
 <template>
@@ -17,8 +31,11 @@ const props = defineProps({
     </div>
     <div class="breathing-ring">
       <input
+        :type="type"
+        :value="modelValue"
         :placeholder="placeholder"
         class="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-slate-800 shadow-[inset_0_1px_1px_rgba(15,23,42,0.06)] focus:border-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-200"
+        @input="onInput"
       />
     </div>
   </label>
