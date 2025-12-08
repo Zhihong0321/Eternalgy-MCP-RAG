@@ -1,7 +1,9 @@
 import os
 import shutil
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from sqlmodel import SQLModel, text, Session
 from sqlalchemy.exc import OperationalError
 import logging
@@ -124,7 +126,30 @@ def health_check():
         }
     }
 
+# ---------- Frontend Static Hosting ----------
+FRONTEND_DIR = os.path.join(os.path.dirname(__file__), "frontend-dist")
+INDEX_PATH = os.path.join(FRONTEND_DIR, "index.html")
 
+if os.path.isdir(FRONTEND_DIR):
+    assets_dir = os.path.join(FRONTEND_DIR, "assets")
+    if os.path.isdir(assets_dir):
+        app.mount("/assets", StaticFiles(directory=assets_dir), name="frontend-assets")
+
+
+@app.get("/", include_in_schema=False)
+def serve_frontend_index():
+    if os.path.isfile(INDEX_PATH):
+        return FileResponse(INDEX_PATH)
+    return {"status": "Z.ai Backend API is running (frontend not built)"}
+
+
+@app.get("/{full_path:path}", include_in_schema=False)
+def serve_frontend_spa(full_path: str):
+    if full_path.startswith("api/"):
+        raise HTTPException(status_code=404, detail="Not found")
+    if os.path.isfile(INDEX_PATH):
+        return FileResponse(INDEX_PATH)
+    raise HTTPException(status_code=404, detail="Not found")
 
 
 if __name__ == "__main__":
