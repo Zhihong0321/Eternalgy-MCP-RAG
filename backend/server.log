@@ -1,0 +1,9 @@
+Traceback (most recent call last):
+  File "/home/mastercoder/better-cli-workspace/ZAI-Chatbot/backend/main.py", line 9, in <module>
+    from dependencies import mcp_manager # Use the shared instance
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/mastercoder/better-cli-workspace/ZAI-Chatbot/backend/dependencies.py", line 2, in <module>
+    from mcp_manager import MCPManager
+  File "/home/mastercoder/better-cli-workspace/ZAI-Chatbot/backend/mcp_manager.py", line 6, in <module>
+    from mcp.client.stdio import stdio_client
+ModuleNotFoundError: No module named 'mcp'
