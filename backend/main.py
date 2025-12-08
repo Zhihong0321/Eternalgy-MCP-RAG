@@ -71,7 +71,7 @@ def seed_mcp_scripts():
 
 @app.on_event("startup")
 async def on_startup():
-    create_db_and_tables()
+    # create_db_and_tables() # Disabled for production safety
     seed_mcp_scripts()
     # Load Z.ai Key from DB if exists
     try:

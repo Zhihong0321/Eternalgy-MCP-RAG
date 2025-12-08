@@ -4,17 +4,20 @@ from sqlmodel import Field, Relationship, SQLModel
 
 
 class SystemSetting(SQLModel, table=True):
+    __tablename__ = "zairag_system_settings"
     key: str = Field(primary_key=True)
     value: str
 
 class AgentMCPServer(SQLModel, table=True):
-    agent_id: Optional[int] = Field(default=None, foreign_key="agent.id", primary_key=True)
+    __tablename__ = "zairag_agent_mcp_links"
+    agent_id: Optional[int] = Field(default=None, foreign_key="zairag_agents.id", primary_key=True)
     mcp_server_id: Optional[int] = Field(
-        default=None, foreign_key="mcpserver.id", primary_key=True
+        default=None, foreign_key="zairag_mcp_servers.id", primary_key=True
     )
 
 
 class Agent(SQLModel, table=True):
+    __tablename__ = "zairag_agents"
     id: Optional[int] = Field(default=None, primary_key=True)
     name: str
     system_prompt: str
@@ -28,8 +31,9 @@ class Agent(SQLModel, table=True):
 
 
 class AgentKnowledgeFile(SQLModel, table=True):
+    __tablename__ = "zairag_agent_knowledge_files"
     id: Optional[int] = Field(default=None, primary_key=True)
-    agent_id: int = Field(foreign_key="agent.id")
+    agent_id: int = Field(foreign_key="zairag_agents.id")
     filename: str
     content: str
 
@@ -37,6 +41,7 @@ class AgentKnowledgeFile(SQLModel, table=True):
 
 
 class MCPServer(SQLModel, table=True):
+    __tablename__ = "zairag_mcp_servers"
     id: Optional[int] = Field(default=None, primary_key=True)
     name: str
     script: str
@@ -58,8 +63,9 @@ class MCPServer(SQLModel, table=True):
 
 
 class ChatSession(SQLModel, table=True):
+    __tablename__ = "zairag_chat_sessions"
     id: Optional[int] = Field(default=None, primary_key=True)
-    agent_id: int = Field(foreign_key="agent.id")
+    agent_id: int = Field(foreign_key="zairag_agents.id")
     
     total_tokens: int = Field(default=0)
     prompt_tokens: int = Field(default=0)
@@ -70,8 +76,9 @@ class ChatSession(SQLModel, table=True):
 
 
 class ChatMessage(SQLModel, table=True):
+    __tablename__ = "zairag_chat_messages"
     id: Optional[int] = Field(default=None, primary_key=True)
-    chat_session_id: int = Field(foreign_key="chatsession.id")
+    chat_session_id: int = Field(foreign_key="zairag_chat_sessions.id")
     role: str
     content: str
 
