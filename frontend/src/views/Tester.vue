@@ -20,6 +20,7 @@ const socketConnecting = ref(false)
 const streamStatus = ref('disconnected')
 const toolStatus = ref('')
 const tokenStats = ref(null)
+const includeReasoning = ref(true)
 
 const currentAgentId = ref('')
 const composer = ref('')
@@ -195,7 +196,12 @@ const sendMessage = () => {
   convo.push({ role: 'user', text: messageText, ts: new Date().toISOString() })
   isSending.value = true
   try {
-    socket.value.send(JSON.stringify({ message: messageText }))
+    socket.value.send(
+      JSON.stringify({
+        message: messageText,
+        include_reasoning: includeReasoning.value
+      })
+    )
     streamStatus.value = 'streaming'
   } catch (error) {
     console.error('Chat send failed', error)
@@ -208,6 +214,10 @@ const sendMessage = () => {
   } finally {
     isSending.value = false
   }
+}
+
+const toggleReasoning = () => {
+  includeReasoning.value = !includeReasoning.value
 }
 
 watch(
@@ -244,6 +254,9 @@ onBeforeUnmount(() => {
             <TuiBadge :variant="statusVariant(streamStatus)">state: {{ streamStatus }}</TuiBadge>
             <TuiBadge v-if="toolStatus" variant="warning">{{ toolStatus }}</TuiBadge>
             <TuiBadge v-if="tokenStats" variant="muted">tokens: {{ tokenStats.total || 0 }}</TuiBadge>
+            <TuiBadge :variant="includeReasoning ? 'success' : 'muted'">
+              reasoning: {{ includeReasoning ? 'on' : 'off' }}
+            </TuiBadge>
           </div>
         </div>
       </header>
@@ -263,6 +276,9 @@ onBeforeUnmount(() => {
             </TuiButton>
             <TuiButton size="sm" variant="outline" @click="connectSocket" :disabled="!currentAgentId">
               Reconnect
+            </TuiButton>
+            <TuiButton size="sm" variant="ghost" @click="toggleReasoning">
+              Reasoning: {{ includeReasoning ? 'On' : 'Off' }}
             </TuiButton>
             <TuiBadge v-if="currentAgent" :variant="statusVariant(currentAgent.status)" class="w-24 justify-center">
               {{ currentAgent.status || 'ready' }}

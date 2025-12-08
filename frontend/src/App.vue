@@ -1,15 +1,17 @@
 <script setup>
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
+import { useTheme } from './composables/theme'
 
 const route = useRoute()
+const { theme } = useTheme()
 
 const isActive = (path) => computed(() => route.path === path || route.path.startsWith(path))
 const showNav = computed(() => !route.meta?.bare)
 </script>
 
 <template>
-  <div class="relative min-h-screen text-gray-900">
+  <div :class="['relative min-h-screen', theme === 'dark' ? 'text-slate-100' : 'text-gray-900']">
     <div class="pointer-events-none absolute inset-0 tui-grid opacity-60" aria-hidden="true"></div>
     <div class="pointer-events-none absolute inset-0 bg-aurora opacity-80" aria-hidden="true"></div>
     <div class="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/80 via-white/60 to-transparent" aria-hidden="true"></div>

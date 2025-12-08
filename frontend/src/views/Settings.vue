@@ -1,9 +1,10 @@
 <script setup>
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import TuiBadge from '../components/ui/TuiBadge.vue'
 import TuiButton from '../components/ui/TuiButton.vue'
 import TuiCard from '../components/ui/TuiCard.vue'
 import TuiInput from '../components/ui/TuiInput.vue'
+import { useTheme } from '../composables/theme'
 
 const API_BASE = `${window.location.origin}/api/v1`
 
@@ -15,6 +16,10 @@ const isSaving = ref(false)
 const isLoading = ref(true)
 
 const statusVariant = () => (status.value === 'set' ? 'success' : 'warning')
+
+const { theme, toggleTheme, setTheme } = useTheme()
+const themeLabel = computed(() => (theme.value === 'dark' ? 'Dark' : 'Light'))
+const nextThemeLabel = computed(() => (theme.value === 'dark' ? 'Light' : 'Dark'))
 
 const fetchStatus = async () => {
   isLoading.value = true
@@ -85,6 +90,20 @@ onMounted(() => {
           </div>
         </div>
       </header>
+
+      <TuiCard title="Appearance" subtitle="theme">
+        <div class="space-y-3">
+          <div class="flex flex-wrap items-center gap-3">
+            <TuiBadge :variant="theme === 'dark' ? 'success' : 'muted'">Theme: {{ themeLabel }}</TuiBadge>
+            <TuiButton @click="toggleTheme">Switch to {{ nextThemeLabel }}</TuiButton>
+            <TuiButton size="sm" variant="outline" @click="setTheme('light')">Light</TuiButton>
+            <TuiButton size="sm" variant="outline" @click="setTheme('dark')">Dark</TuiButton>
+          </div>
+          <p class="text-xs text-slate-600">
+            Applies instantly and persists locally on this device.
+          </p>
+        </div>
+      </TuiCard>
 
       <TuiCard title="Z.ai API Key" subtitle="credentials">
         <div class="space-y-4">
