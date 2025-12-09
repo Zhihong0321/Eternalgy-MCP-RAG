@@ -47,8 +47,15 @@ app.add_middleware(
 
 def seed_mcp_scripts():
     """Seeds initial MCP scripts to the persistent volume if missing."""
-    scripts_dir = os.getenv("MCP_SCRIPTS_DIR", "/app/mcp-runtime-scripts")
-    initial_dir = "/app/mcp_servers"
+        # Determine paths relative to this file (main.py) to ensure compatibility 
+        # with different environments (Docker, Railway/Nixpacks, Local).
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        
+        # Default: ./mcp-runtime-scripts (relative to backend/)
+        scripts_dir = os.getenv("MCP_SCRIPTS_DIR", os.path.join(base_dir, "mcp-runtime-scripts"))
+        
+        # Default: ./mcp_servers (relative to backend/)
+        initial_dir = os.getenv("MCP_INITIAL_DIR", os.path.join(base_dir, "mcp_servers"))
     
     # Create target dir if it doesn't exist (it should be a volume, but just in case)
     os.makedirs(scripts_dir, exist_ok=True)
@@ -82,7 +89,7 @@ def seed_mcp_scripts():
 
 @app.on_event("startup")
 async def on_startup():
-    create_db_and_tables() # Enabled for development
+    # create_db_and_tables() # Disabled for production/Railway. Database schema is managed externally.
     seed_mcp_scripts()
     # Load Z.ai Key from DB if exists
     try:

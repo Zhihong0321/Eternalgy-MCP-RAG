@@ -79,7 +79,13 @@ async def start_mcp_server(server_id: int, session: Session = Depends(get_sessio
     if not server:
         raise HTTPException(status_code=404, detail="Server not found")
 
-    scripts_dir = os.getenv("MCP_SCRIPTS_DIR", "/app/mcp-runtime-scripts")
+    # Determine paths relative to this file's parent (backend/) to ensure compatibility
+    # with different environments (Docker, Railway, Local).
+    # This file is in routers/, so parent is backend/
+    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    
+    scripts_dir = os.getenv("MCP_SCRIPTS_DIR", os.path.join(base_dir, "mcp-runtime-scripts"))
+
     # Correctly resolve the script path, supporting subdirectories
     full_script_path_in_scripts_dir = os.path.join(scripts_dir, server.script)
     
