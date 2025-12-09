@@ -47,12 +47,22 @@ const formatTokens = (value) => {
   return `${num}`
 }
 
+const extractLinkedMcpIds = (agent) => {
+  if (!agent) return []
+  if (Array.isArray(agent.linked_mcp_ids)) return agent.linked_mcp_ids
+  if (Array.isArray(agent.linkedMcpIds)) return agent.linkedMcpIds
+  if (agent.linkedMcpId) return [agent.linkedMcpId]
+  if (agent.linked_mcp_id) return [agent.linked_mcp_id]
+  return []
+}
+
 const resetForm = (agent) => {
+  const linkedIds = extractLinkedMcpIds(agent)
   form.id = agent?.id ?? null
   form.name = agent?.name ?? ''
   form.model = agent?.model ?? 'glm-4.5-flash'
   form.system_prompt = agent?.system_prompt ?? agent?.systemPrompt ?? ''
-  form.linkedMcpId = agent?.linkedMcpId ?? agent?.linked_mcp_id ?? ''
+  form.linkedMcpId = linkedIds[0] ?? ''
 }
 
 const loadAgents = async () => {
@@ -63,16 +73,21 @@ const loadAgents = async () => {
     if (!res.ok) throw new Error('Failed to fetch agents')
     const data = await res.json()
     agents.value = Array.isArray(data)
-      ? data.map((agent, index) => ({
-          id: agent.id ?? index,
-          name: agent.name ?? 'Unknown Agent',
-          model: agent.model ?? 'n/a',
-          status: (agent.status ?? 'ready').toLowerCase(),
-          lastActive: agent.lastActive ?? agent.last_active ?? '—',
-          tokenCountToday: agent.tokenCountToday ?? agent.token_count_today ?? 0,
-          linkedMcpId: agent.linkedMcpId ?? agent.linked_mcp_id ?? '',
-          system_prompt: agent.system_prompt ?? ''
-      }))
+      ? data.map((agent, index) => {
+          const linkedIds = extractLinkedMcpIds(agent)
+          return {
+            id: agent.id ?? index,
+            name: agent.name ?? 'Unknown Agent',
+            model: agent.model ?? 'n/a',
+            status: (agent.status ?? 'ready').toLowerCase(),
+            lastActive: agent.lastActive ?? agent.last_active ?? '—',
+            tokenCountToday: agent.tokenCountToday ?? agent.token_count_today ?? 0,
+            linkedMcpIds: linkedIds,
+            linkedMcpId: linkedIds[0] ?? '',
+            linkedMcpCount: agent.linked_mcp_count ?? agent.linkedMcpCount ?? linkedIds.length,
+            system_prompt: agent.system_prompt ?? ''
+          }
+      })
       : []
   } catch (error) {
     console.error('Failed to load agents', error)
@@ -281,7 +296,9 @@ onMounted(() => {
                 >
                   delete
                 </TuiButton>
-                <TuiBadge variant="muted">mcp: {{ agent.linkedMcpId || 'none' }}</TuiBadge>
+                <TuiBadge variant="muted">
+                  mcp: {{ agent.linkedMcpCount || 0 }} linked
+                </TuiBadge>
               </div>
             </div>
             <div v-if="!agents.length" class="py-6 text-sm text-slate-600">

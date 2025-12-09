@@ -30,6 +30,23 @@ class Agent(SQLModel, table=True):
     knowledge_files: List["AgentKnowledgeFile"] = Relationship(back_populates="agent")
 
 
+class AgentRead(SQLModel):
+    """
+    Lightweight response model for agent listings that includes MCP linkage info.
+    """
+
+    id: Optional[int]
+    name: str
+    system_prompt: str
+    model: str
+
+    linked_mcp_ids: List[int] = Field(default_factory=list)
+    linked_mcp_count: int = 0
+
+    class Config:
+        from_attributes = True
+
+
 class AgentKnowledgeFile(SQLModel, table=True):
     __tablename__ = "zairag_agent_knowledge_files"
     id: Optional[int] = Field(default=None, primary_key=True)
@@ -116,4 +133,3 @@ class ChatResponse(SQLModel):
 
 
     response: str
-

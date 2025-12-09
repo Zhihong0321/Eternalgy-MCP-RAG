@@ -3,13 +3,34 @@ from sqlmodel import Session, select
 from typing import List
 
 from database import get_session
-from models import Agent, AgentMCPServer, MCPServer, AgentKnowledgeFile
+from models import Agent, AgentMCPServer, MCPServer, AgentKnowledgeFile, AgentRead
 
 router = APIRouter(prefix="/api/v1/agents", tags=["Agent Management"])
 
-@router.get("/", response_model=List[Agent])
+@router.get("/", response_model=List[AgentRead])
 def list_agents(session: Session = Depends(get_session)):
-    return session.exec(select(Agent)).all()
+    agents = session.exec(select(Agent)).all()
+    results: List[AgentRead] = []
+
+    for agent in agents:
+        linked_ids = [
+            link_id
+            for link_id in session.exec(
+                select(AgentMCPServer.mcp_server_id).where(AgentMCPServer.agent_id == agent.id)
+            ).all()
+            if link_id is not None
+        ]
+
+        agent_data = agent.dict(exclude={"chat_sessions", "mcp_servers", "knowledge_files"})
+        results.append(
+            AgentRead(
+                **agent_data,
+                linked_mcp_ids=linked_ids,
+                linked_mcp_count=len(linked_ids)
+            )
+        )
+
+    return results
 
 @router.post("/", response_model=Agent)
 def create_agent(agent: Agent, session: Session = Depends(get_session)):
