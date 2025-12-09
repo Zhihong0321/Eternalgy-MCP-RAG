@@ -3,6 +3,7 @@ from sqlmodel import Session, select
 from typing import List, Dict, Any
 import json
 import logging
+import os
 from openai import RateLimitError
 
 from database import get_session
@@ -46,6 +47,10 @@ async def chat_with_agent(
     tools = []
     tool_map = {} # tool_name -> mcp_server_id
     
+    # Determine paths relative to this file's parent (backend/)
+    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    scripts_dir = os.getenv("MCP_SCRIPTS_DIR", os.path.join(base_dir, "mcp-runtime-scripts"))
+
     for server_id in mcp_server_ids:
         try:
             # Ensure server is "started" (registered in manager)
@@ -68,8 +73,11 @@ async def chat_with_agent(
                              args = json.loads(mcp_server_db.args)
                          except:
                              pass
+                     
                      if not args and mcp_server_db.command == "python":
-                         args = [mcp_server_db.script]
+                         # Resolve full path
+                         full_script_path = os.path.join(scripts_dir, mcp_server_db.script)
+                         args = [full_script_path]
 
                      await mcp_manager.spawn_mcp(
                          str(server_id), 

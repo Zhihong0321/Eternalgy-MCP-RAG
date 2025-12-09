@@ -3,6 +3,7 @@ from sqlmodel import Session, select
 import json
 import logging
 import asyncio
+import os
 from typing import List, Dict, Any, Tuple
 
 from database import get_session
