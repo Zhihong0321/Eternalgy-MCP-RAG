@@ -61,29 +61,21 @@ def seed_mcp_scripts():
     os.makedirs(scripts_dir, exist_ok=True)
     
     if os.path.exists(initial_dir):
-        logger.info(f"Seeding MCP scripts from {initial_dir} to {scripts_dir}...")
+        logger.info(f"Syncing MCP scripts from {initial_dir} to {scripts_dir}...")
         for item_name in os.listdir(initial_dir):
             src_path = os.path.join(initial_dir, item_name)
             dst_path = os.path.join(scripts_dir, item_name)
 
-            if os.path.isdir(src_path):
-                if not os.path.exists(dst_path):
-                    try:
-                        shutil.copytree(src_path, dst_path)
-                        logger.info(f"Seeded directory {item_name}")
-                    except Exception as e:
-                        logger.error(f"Failed to seed directory {item_name}: {e}")
-                else:
-                    logger.debug(f"Directory {item_name} already exists, skipping.")
-            elif os.path.isfile(src_path) and (item_name.endswith(".py") or item_name.endswith(".json")):
-                if not os.path.exists(dst_path):
-                    try:
-                        shutil.copy2(src_path, dst_path)
-                        logger.info(f"Seeded file {item_name}")
-                    except Exception as e:
-                        logger.error(f"Failed to seed file {item_name}: {e}")
-                else:
-                    logger.debug(f"File {item_name} already exists, skipping.")
+            try:
+                if os.path.isdir(src_path):
+                    # dirs_exist_ok=True allows overwriting/merging
+                    shutil.copytree(src_path, dst_path, dirs_exist_ok=True)
+                    logger.info(f"Synced directory {item_name}")
+                elif os.path.isfile(src_path) and (item_name.endswith(".py") or item_name.endswith(".json")):
+                    shutil.copy2(src_path, dst_path)
+                    logger.info(f"Synced file {item_name}")
+            except Exception as e:
+                logger.error(f"Failed to sync {item_name}: {e}")
     else:
         logger.warning(f"Initial MCP directory {initial_dir} not found. Skipping seeding.")
 
