@@ -1,12 +1,11 @@
 <script setup>
-import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import TuiBadge from '../components/ui/TuiBadge.vue'
 import TuiButton from '../components/ui/TuiButton.vue'
 import TuiSelect from '../components/ui/TuiSelect.vue'
 
 const API_BASE = `${window.location.origin}/api/v1`
-const WS_BASE = `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/api/v1/ws`
 
 const route = useRoute()
 const router = useRouter()
@@ -17,11 +16,6 @@ const agentError = ref('')
 const isSending = ref(false)
 const composer = ref('')
 const status = ref('idle')
-const socket = ref(null)
-const socketReady = ref(false)
-const socketConnecting = ref(false)
-const streamStatus = ref('disconnected')
-const toolStatus = ref('')
 const tokenStats = ref(null)
 
 const conversations = reactive({})
@@ -88,107 +82,16 @@ const setAgentFromRoute = () => {
 const handleAgentChange = (agentId) => {
   currentAgentId.value = agentId
   router.replace({ name: 'Chat', params: { agentId } })
-  connectSocket()
 }
 
 const startNewChat = () => {
   if (!currentAgentId.value) return
   conversations[String(currentAgentId.value)] = []
   tokenStats.value = null
-  streamStatus.value = 'ready'
-}
-
-const cleanupSocket = () => {
-  if (socket.value) {
-    socket.value.close()
-    socket.value = null
-  }
-  socketReady.value = false
-  socketConnecting.value = false
-}
-
-const connectSocket = () => {
-  cleanupSocket()
-  const agentId = currentAgentId.value
-  if (!agentId) return
-
-  socketConnecting.value = true
-  streamStatus.value = 'connecting'
-  tokenStats.value = null
-  toolStatus.value = ''
-
-  const ws = new WebSocket(`${WS_BASE}/chat/${agentId}`)
-  socket.value = ws
-
-  ws.onopen = () => {
-    socketReady.value = true
-    socketConnecting.value = false
-    streamStatus.value = 'ready'
-  }
-
-  ws.onmessage = (event) => {
-    const data = JSON.parse(event.data)
-    const convo = ensureConversation(String(agentId))
-
-    switch (data.type) {
-      case 'token': {
-        let last = convo[convo.length - 1]
-        if (!last || last.role !== 'assistant') {
-          last = { role: 'assistant', text: '', ts: new Date().toISOString() }
-          convo.push(last)
-        }
-        last.text += data.content || ''
-        streamStatus.value = 'streaming'
-        break
-      }
-      case 'tool_start': {
-        toolStatus.value = `Using ${data.tool || 'tool'}...`
-        streamStatus.value = 'tool'
-        break
-      }
-      case 'tool_end': {
-        toolStatus.value = ''
-        break
-      }
-      case 'done': {
-        streamStatus.value = 'ready'
-        tokenStats.value = data.tokens || null
-        break
-      }
-      case 'error': {
-        streamStatus.value = 'error'
-        convo.push({
-          role: 'assistant',
-          text: data.content || 'Error from server.',
-          ts: new Date().toISOString()
-        })
-        break
-      }
-      default:
-        break
-    }
-  }
-
-  ws.onerror = () => {
-    streamStatus.value = 'error'
-    socketReady.value = false
-    socketConnecting.value = false
-  }
-
-  ws.onclose = () => {
-    socketReady.value = false
-    socketConnecting.value = false
-    streamStatus.value = 'disconnected'
-  }
 }
 
 const sendMessage = async () => {
   if (!currentAgentId.value || !composer.value.trim()) return
-  if (!socketReady.value || !socket.value) {
-    agentError.value = 'Socket not ready. Reconnecting...'
-    connectSocket()
-    return
-  }
 
   const agentId = currentAgentId.value
   const messageText = composer.value.trim()
@@ -198,17 +101,41 @@ const sendMessage = async () => {
   convo.push({ role: 'user', text: messageText, ts: new Date().toISOString() })
   status.value = 'sending'
   isSending.value = true
+  agentError.value = ''
 
   try {
-    socket.value.send(JSON.stringify({ message: messageText }))
-    streamStatus.value = 'streaming'
+    const res = await fetch(`${API_BASE}/chat/`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        agent_id: parseInt(agentId),
+        message: messageText
+      })
+    })
+
+    if (!res.ok) {
+      throw new Error(`API Error: ${res.statusText}`)
+    }
+
+    const data = await res.json()
+    
+    // Add assistant response to conversation
+    convo.push({
+      role: 'assistant',
+      text: data.response || 'No response text.',
+      ts: new Date().toISOString()
+    })
+    
+    status.value = 'idle'
   } catch (error) {
     console.error('Chat send failed', error)
     status.value = 'degraded'
-    streamStatus.value = 'error'
+    agentError.value = error.message || 'Failed to send message'
     convo.push({
       role: 'assistant',
-      text: 'Send failed. Check socket connection.',
+      text: 'Send failed. Please try again.',
       ts: new Date().toISOString()
     })
   } finally {
@@ -225,10 +152,6 @@ onMounted(() => {
   setAgentFromRoute()
   loadAgents()
 })
-
-onBeforeUnmount(() => {
-  cleanupSocket()
-})
 </script>
 
 <template>
@@ -243,10 +166,8 @@ onBeforeUnmount(() => {
               Select an agent, review prior messages, and start a new chat session. Mobile-friendly layout for testers.
             </p>
             <div class="flex flex-wrap items-center gap-2">
-              <TuiBadge variant="info">ws /api/v1/ws/chat</TuiBadge>
-      <TuiBadge variant="muted">base: dynamic (current host)</TuiBadge>
-              <TuiBadge :variant="statusVariant(streamStatus)">state: {{ streamStatus }}</TuiBadge>
-              <TuiBadge v-if="toolStatus" variant="warning">{{ toolStatus }}</TuiBadge>
+              <TuiBadge variant="info">POST /api/v1/chat</TuiBadge>
+              <TuiBadge variant="muted">base: dynamic (current host)</TuiBadge>
             </div>
           </div>
           <div class="flex flex-wrap items-center gap-2">
@@ -271,12 +192,9 @@ onBeforeUnmount(() => {
               {{ currentAgent.status || 'ready' }}
             </TuiBadge>
             <TuiBadge variant="muted">agents: {{ agents.length }}</TuiBadge>
-            <TuiBadge v-if="tokenStats" variant="muted">
-              tokens: {{ tokenStats.total || 0 }}
-            </TuiBadge>
           </div>
         </div>
-        <p v-if="agentError" class="text-xs text-slate-600">{{ agentError }}</p>
+        <p v-if="agentError" class="text-xs text-red-600">{{ agentError }}</p>
       </section>
 
       <section class="grid gap-4 lg:grid-cols-[1.4fr_1fr]">
@@ -321,6 +239,11 @@ onBeforeUnmount(() => {
                     </p>
                   </div>
                 </div>
+                <div v-if="isSending" class="flex justify-start">
+                   <div class="max-w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-500 italic">
+                      Thinking...
+                   </div>
+                </div>
               </div>
             </div>
 
@@ -334,14 +257,14 @@ onBeforeUnmount(() => {
                 <textarea
                   v-model="composer"
                   rows="3"
-                  :disabled="!currentAgentId"
+                  :disabled="!currentAgentId || isSending"
                   placeholder="Type a message to the agent. Press Send to dispatch."
                   class="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 shadow-[inset_0_1px_1px_rgba(15,23,42,0.06)] focus:border-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-200 disabled:cursor-not-allowed disabled:bg-slate-100"
                 ></textarea>
               </div>
             </label>
             <div class="flex flex-wrap items-center gap-3">
-              <TuiButton :loading="isSending" @click="sendMessage" :disabled="!currentAgentId">
+              <TuiButton :loading="isSending" @click="sendMessage" :disabled="!currentAgentId || isSending">
                 Send
               </TuiButton>
               <TuiButton variant="outline" @click="startNewChat" :disabled="!currentAgentId">New chat</TuiButton>
