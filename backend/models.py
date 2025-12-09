@@ -47,6 +47,14 @@ class AgentRead(SQLModel):
         from_attributes = True
 
 
+class AgentUpdate(SQLModel):
+    """Payload for updating an agent."""
+
+    name: Optional[str] = None
+    system_prompt: Optional[str] = None
+    model: Optional[str] = None
+
+
 class AgentKnowledgeFile(SQLModel, table=True):
     __tablename__ = "zairag_agent_knowledge_files"
     id: Optional[int] = Field(default=None, primary_key=True)

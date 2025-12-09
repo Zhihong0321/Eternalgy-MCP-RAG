@@ -4,7 +4,7 @@ from typing import List
 from sqlalchemy.exc import IntegrityError
 
 from database import get_session
-from models import Agent, AgentMCPServer, MCPServer, AgentKnowledgeFile, AgentRead
+from models import Agent, AgentMCPServer, MCPServer, AgentKnowledgeFile, AgentRead, AgentUpdate
 
 router = APIRouter(prefix="/api/v1/agents", tags=["Agent Management"])
 
@@ -39,6 +39,34 @@ def create_agent(agent: Agent, session: Session = Depends(get_session)):
     session.commit()
     session.refresh(agent)
     return agent
+
+@router.put("/{agent_id}", response_model=Agent)
+def update_agent(agent_id: int, payload: AgentUpdate, session: Session = Depends(get_session)):
+    agent = session.get(Agent, agent_id)
+    if not agent:
+        raise HTTPException(status_code=404, detail="Agent not found")
+
+    if payload.name is not None:
+        agent.name = payload.name
+    if payload.system_prompt is not None:
+        agent.system_prompt = payload.system_prompt
+    if payload.model is not None:
+        agent.model = payload.model
+
+    session.add(agent)
+    session.commit()
+    session.refresh(agent)
+    return agent
+
+@router.delete("/{agent_id}")
+def delete_agent(agent_id: int, session: Session = Depends(get_session)):
+    agent = session.get(Agent, agent_id)
+    if not agent:
+        raise HTTPException(status_code=404, detail="Agent not found")
+
+    session.delete(agent)
+    session.commit()
+    return {"message": "Agent deleted"}
 
 @router.post("/{agent_id}/link-mcp/{server_id}")
 def link_mcp_to_agent(agent_id: int, server_id: int, session: Session = Depends(get_session)):
