@@ -182,12 +182,22 @@ def format_solar_impact(table: BillTable, rm: float, morning_usage_percentage: f
     system_kwp = panel_qty * PANEL_RATING_KWP
 
     lines = [
-        "Solar impact estimate:",
-        f"- System Size: {panel_qty:.1f} panels (~{system_kwp:.2f} kWp)",
-        f"- Bill Reduction: RM {bill_reduction:.2f}",
-        f"- Export Income: RM {export_income:.2f}",
-        f"- Total Monthly Saving: RM {total_saving:.2f}",
-        f"- New Net Payable: RM {new_payable:.2f}",
+        f"Qty Panel Required : {panel_qty:.1f} panel",
+        "Panel used = Jinko Tiger Neo N-Type 620W Rating",
+        f"Solar PV System Size = {panel_qty:.1f} * 0.62kw = {system_kwp:.2f} kWp",
+        "",
+        "------",
+        "",
+        f"Original Bill Monthly = RM {rm:.2f}",
+        "",
+        "After Solar =",
+        f"- Based on {morning_usage_percentage}% usage in morning (happen during solar generation)",
+        f"- Based on {sunpeak_hour} hours Sun Peak Hour",
+        "",
+        f"- Bill Reduced to = RM {new_bill:.2f}",
+        f"- Excess Solar Generation Export Earning = RM {export_income:.2f} ( at RM0.20 SMP rate )",
+        "",
+        f"- Total Saved = RM {total_saving:.2f}",
     ]
     return [TextContent(type="text", text="\n".join(lines))]
 
