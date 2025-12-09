@@ -111,3 +111,12 @@ async def upload_agent_knowledge(agent_id: int, file: UploadFile = File(...), se
     session.commit()
     session.refresh(knowledge)
     return knowledge
+
+@router.get("/{agent_id}/knowledge", response_model=List[AgentKnowledgeFile])
+def list_agent_knowledge(agent_id: int, session: Session = Depends(get_session)):
+    agent = session.get(Agent, agent_id)
+    if not agent:
+        raise HTTPException(status_code=404, detail="Agent not found")
+    
+    files = session.exec(select(AgentKnowledgeFile).where(AgentKnowledgeFile.agent_id == agent_id)).all()
+    return files

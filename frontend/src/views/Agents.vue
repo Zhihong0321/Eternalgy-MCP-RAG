@@ -10,12 +10,242 @@ const API_BASE = `${window.location.origin}/api/v1`
 
 const agents = ref([])
 const mcpServers = ref([])
+const knowledgeFiles = ref([])
 const isLoading = ref(true)
 const mcpLoading = ref(true)
 const isSaving = ref(false)
 const isUploading = ref(false)
 const deletingAgentId = ref(null)
 const message = ref('')
+
+const modelOptions = [
+  { label: 'glm-4.5-flash', value: 'glm-4.5-flash' },
+  { label: 'glm-4.6', value: 'glm-4.6' },
+  { label: 'claude-3.5', value: 'claude-3.5' },
+  { label: 'gpt-4o-mini', value: 'gpt-4o-mini' }
+]
+
+const form = reactive({
+  id: null,
+  name: '',
+  model: 'glm-4.5-flash',
+  system_prompt: '',
+  linkedMcpId: '',
+  reasoning_enabled: true
+})
+
+const statusVariant = (status) => {
+  const normalized = (status || '').toLowerCase()
+  if (normalized === 'live' || normalized === 'active' || normalized === 'ready') return 'success'
+  if (normalized === 'watch' || normalized === 'syncing' || normalized === 'cooldown') return 'warning'
+  return 'muted'
+}
+
+const formatTokens = (value) => {
+  const num = Number(value)
+  if (Number.isNaN(num)) return value || '—'
+  if (num >= 1_000_000) return `${(num / 1_000_000).toFixed(1)}M`
+  if (num >= 1_000) return `${(num / 1_000).toFixed(1)}K`
+  return `${num}`
+}
+
+const extractLinkedMcpIds = (agent) => {
+  if (!agent) return []
+  if (Array.isArray(agent.linked_mcp_ids)) return agent.linked_mcp_ids
+  if (Array.isArray(agent.linkedMcpIds)) return agent.linkedMcpIds
+  if (agent.linkedMcpId) return [agent.linkedMcpId]
+  if (agent.linked_mcp_id) return [agent.linked_mcp_id]
+  return []
+}
+
+const loadKnowledgeFiles = async (agentId) => {
+  if (!agentId) {
+    knowledgeFiles.value = []
+    return
+  }
+  try {
+    const res = await fetch(`${API_BASE}/agents/${agentId}/knowledge`)
+    if (!res.ok) throw new Error('Failed to load knowledge')
+    const data = await res.json()
+    knowledgeFiles.value = Array.isArray(data) ? data : []
+  } catch (error) {
+    console.error('Failed to load knowledge files', error)
+    knowledgeFiles.value = []
+  }
+}
+
+const resetForm = (agent) => {
+  const linkedIds = extractLinkedMcpIds(agent)
+  form.id = agent?.id ?? null
+  form.name = agent?.name ?? ''
+  form.model = agent?.model ?? 'glm-4.5-flash'
+  form.system_prompt = agent?.system_prompt ?? agent?.systemPrompt ?? ''
+  form.linkedMcpId = linkedIds[0] ?? ''
+  form.reasoning_enabled = agent?.reasoning_enabled ?? true
+  
+  if (form.id) {
+    loadKnowledgeFiles(form.id)
+  } else {
+    knowledgeFiles.value = []
+  }
+}
+
+const loadAgents = async () => {
+  isLoading.value = true
+  message.value = ''
+  try {
+    const res = await fetch(`${API_BASE}/agents/`)
+    if (!res.ok) throw new Error('Failed to fetch agents')
+    const data = await res.json()
+    agents.value = Array.isArray(data)
+      ? data.map((agent, index) => {
+          const linkedIds = extractLinkedMcpIds(agent)
+          return {
+            id: agent.id ?? index,
+            name: agent.name ?? 'Unknown Agent',
+            model: agent.model ?? 'n/a',
+            status: (agent.status ?? 'ready').toLowerCase(),
+            lastActive: agent.lastActive ?? agent.last_active ?? '—',
+            tokenCountToday: agent.tokenCountToday ?? agent.token_count_today ?? 0,
+            linkedMcpIds: linkedIds,
+            linkedMcpId: linkedIds[0] ?? '',
+            linkedMcpCount: agent.linked_mcp_count ?? agent.linkedMcpCount ?? linkedIds.length,
+            system_prompt: agent.system_prompt ?? '',
+            reasoning_enabled: agent.reasoning_enabled ?? true
+          }
+      })
+      : []
+  } catch (error) {
+    console.error('Failed to load agents', error)
+    message.value = 'Failed to load agents from API.'
+    agents.value = []
+  } finally {
+    isLoading.value = false
+  }
+}
+
+const loadMcpServers = async () => {
+  mcpLoading.value = true
+  try {
+    const res = await fetch(`${API_BASE}/mcp/servers`)
+    if (!res.ok) throw new Error('Failed to fetch mcp servers')
+    const data = await res.json()
+    mcpServers.value = Array.isArray(data)
+      ? data.map((server, index) => ({
+          id: server.id ?? index,
+          name: server.name ?? 'server',
+          status: (server.status ?? 'online').toLowerCase(),
+          endpoint: server.endpoint ?? server.script ?? ''
+      }))
+      : []
+  } catch (error) {
+    console.error('Failed to load mcp servers', error)
+    mcpServers.value = []
+  } finally {
+    mcpLoading.value = false
+  }
+}
+
+const saveAgent = async () => {
+  isSaving.value = true
+  message.value = ''
+  try {
+    const method = form.id ? 'PUT' : 'POST'
+    const url = form.id ? `${API_BASE}/agents/${form.id}` : `${API_BASE}/agents/`
+    const payload = {
+      name: form.name,
+      model: form.model,
+      system_prompt: form.system_prompt,
+      reasoning_enabled: form.reasoning_enabled
+    }
+
+    const res = await fetch(url, {
+      method,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    })
+
+    if (!res.ok) throw new Error('Failed to save agent')
+    message.value = form.id ? 'Agent updated' : 'Agent created'
+    await loadAgents()
+    // Don't reset form fully on edit save, just reload
+    if (!form.id) resetForm()
+  } catch (error) {
+    console.error('Save agent failed', error)
+    message.value = 'Save failed. Check API connectivity.'
+  } finally {
+    isSaving.value = false
+  }
+}
+
+const deleteAgent = async (agentId) => {
+  if (!agentId) return
+  const confirmDelete = window.confirm('Delete this agent? This action cannot be undone.')
+  if (!confirmDelete) return
+
+  deletingAgentId.value = agentId
+  message.value = ''
+  try {
+    const res = await fetch(`${API_BASE}/agents/${agentId}`, { method: 'DELETE' })
+    if (!res.ok) throw new Error('Failed to delete agent')
+    message.value = 'Agent deleted.'
+    await loadAgents()
+    if (form.id === agentId) resetForm()
+  } catch (error) {
+    console.error('Delete agent failed', error)
+    message.value = 'Delete failed. Confirm backend DELETE /agents/{id} is available.'
+  } finally {
+    deletingAgentId.value = null
+  }
+}
+
+const linkMcp = async () => {
+  if (!form.id || !form.linkedMcpId) {
+    message.value = 'Select an agent and MCP to link.'
+    return
+  }
+
+  try {
+    const res = await fetch(`${API_BASE}/agents/${form.id}/link-mcp/${form.linkedMcpId}`, {
+      method: 'POST'
+    })
+    if (!res.ok) throw new Error('Failed to link MCP')
+    message.value = 'MCP linked to agent.'
+    await loadAgents()
+  } catch (error) {
+    console.error('Link MCP failed', error)
+    message.value = 'Link failed. Confirm backend endpoint.'
+  }
+}
+
+const handleFileUpload = async (event) => {
+  const file = event.target.files?.[0]
+  if (!file || !form.id) {
+    message.value = 'Select an agent before uploading.'
+    event.target.value = ''
+    return
+  }
+
+  isUploading.value = true
+  message.value = ''
+  try {
+    const formData = new FormData()
+    formData.append('file', file)
+    const res = await fetch(`${API_BASE}/agents/${form.id}/knowledge`, {
+      method: 'POST',
+      body: formData
+    })
+    if (!res.ok) throw new Error('Failed to upload file')
+    message.value = 'File uploaded to agent knowledge.'
+    await loadKnowledgeFiles(form.id)
+  } catch (error) {
+    console.error('Upload failed', error)
+    message.value = 'Upload failed. Verify backend handler.'
+  } finally {
+    isUploading.value = false
+    event.target.value = ''
+  }
+}
 
 const modelOptions = [
   { label: 'glm-4.5-flash', value: 'glm-4.5-flash' },
@@ -358,6 +588,20 @@ onMounted(() => {
               <p class="text-xs text-slate-600">
                 {{ form.id ? 'Uploads will POST to /agents/{id}/knowledge' : 'Save the agent before uploading.' }}
               </p>
+              
+              <!-- Knowledge Files List -->
+              <div v-if="form.id" class="mt-2 rounded-md border border-slate-100 bg-slate-50 p-2 text-sm">
+                <p class="mb-2 text-[10px] font-semibold uppercase tracking-wider text-slate-400">Attached Knowledge</p>
+                <ul v-if="knowledgeFiles.length" class="space-y-1">
+                  <li v-for="file in knowledgeFiles" :key="file.id" class="flex items-center gap-2 text-slate-700">
+                    <svg class="h-4 w-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    <span class="truncate">{{ file.filename }}</span>
+                  </li>
+                </ul>
+                <p v-else class="text-xs text-slate-400 italic">No files attached.</p>
+              </div>
             </div>
             <div class="flex flex-wrap gap-3">
               <TuiButton :loading="isSaving" @click="saveAgent">
