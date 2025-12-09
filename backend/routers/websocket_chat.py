@@ -85,8 +85,16 @@ async def websocket_endpoint(
                 mcp_server_db = session.get(MCPServer, server_id)
                 if mcp_server_db:
                     status = await mcp_manager.get_mcp_status(str(server_id))
-                    if status == "not found":
-                         await mcp_manager.spawn_mcp(str(server_id), "python", [mcp_server_db.script])
+                    if status.get("status") == "not found":
+                         # Resolve script path
+                         # Determine paths relative to this file's parent (backend/) to ensure compatibility
+                         # with different environments (Docker, Railway, Local).
+                         # This file is in routers/, so parent is backend/
+                         base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+                         scripts_dir = os.getenv("MCP_SCRIPTS_DIR", os.path.join(base_dir, "mcp-runtime-scripts"))
+                         full_script_path = os.path.join(scripts_dir, mcp_server_db.script)
+                         
+                         await mcp_manager.spawn_mcp(str(server_id), "python", [full_script_path])
                 
                 server_tools = await mcp_manager.list_mcp_tools(str(server_id))
                 for tool in server_tools:
