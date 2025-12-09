@@ -19,14 +19,20 @@ router = APIRouter(prefix="/api/v1/mcp", tags=["MCP Management"])
 @router.get("/servers", response_model=List[MCPServer])
 async def list_mcp_servers(session: Session = Depends(get_session), mcp_manager: MCPManager = Depends(get_mcp_manager)):
     servers = session.exec(select(MCPServer)).all()
-    scripts_dir = os.getenv("MCP_SCRIPTS_DIR", "/app/scripts")
+    
+    # Determine paths relative to this file's parent (backend/) to ensure compatibility
+    # with different environments (Docker, Railway, Local).
+    # This file is in routers/, so parent is backend/
+    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    scripts_dir = os.getenv("MCP_SCRIPTS_DIR", os.path.join(base_dir, "mcp-runtime-scripts"))
     
     # Enrich with runtime status if available
     for server in servers:
         status_info = await mcp_manager.get_mcp_status(str(server.id))
         
         # Check script existence
-        script_path = os.path.join(scripts_dir, os.path.basename(server.script))
+        # We join directly to support subdirectories (e.g. "billing-v2/main.py")
+        script_path = os.path.join(scripts_dir, server.script)
         script_exists = os.path.exists(script_path)
 
         if status_info.get("status") != "not found":
