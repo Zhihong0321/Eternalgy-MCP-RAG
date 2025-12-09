@@ -121,7 +121,7 @@ async def chat_with_agent(
                 messages=messages,
                 model=agent.model,
                 tools=tools if tools else None,
-                include_reasoning=request.include_reasoning
+                include_reasoning=agent.reasoning_enabled
             )
         except RateLimitError:
             logger.error("Z.ai Rate Limit Exceeded")

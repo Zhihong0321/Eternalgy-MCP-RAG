@@ -22,6 +22,7 @@ class Agent(SQLModel, table=True):
     name: str
     system_prompt: str
     model: str
+    reasoning_enabled: bool = Field(default=True)
 
     chat_sessions: List["ChatSession"] = Relationship(back_populates="agent")
     mcp_servers: List["MCPServer"] = Relationship(
@@ -39,6 +40,7 @@ class AgentRead(SQLModel):
     name: str
     system_prompt: str
     model: str
+    reasoning_enabled: bool = True
 
     linked_mcp_ids: List[int] = Field(default_factory=list)
     linked_mcp_count: int = 0
@@ -53,6 +55,7 @@ class AgentUpdate(SQLModel):
     name: Optional[str] = None
     system_prompt: Optional[str] = None
     model: Optional[str] = None
+    reasoning_enabled: Optional[bool] = None
 
 
 class AgentKnowledgeFile(SQLModel, table=True):

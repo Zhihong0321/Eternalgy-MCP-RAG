@@ -81,7 +81,15 @@ def seed_mcp_scripts():
 
 @app.on_event("startup")
 async def on_startup():
-    # create_db_and_tables() # Disabled for production/Railway. Database schema is managed externally.
+    # create_db_and_tables() # Enabled for local testing and initial setup
+    
+    # Run simple migration for new field
+    try:
+        import subprocess
+        subprocess.run(["python", "migrate_add_reasoning.py"], check=False)
+    except Exception as e:
+        logger.error(f"Migration script failed: {e}")
+
     seed_mcp_scripts()
     # Load Z.ai Key from DB if exists
     try:

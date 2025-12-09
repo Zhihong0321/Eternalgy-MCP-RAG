@@ -29,7 +29,8 @@ const form = reactive({
   name: '',
   model: 'glm-4.5-flash',
   system_prompt: '',
-  linkedMcpId: ''
+  linkedMcpId: '',
+  reasoning_enabled: true
 })
 
 const statusVariant = (status) => {
@@ -63,6 +64,7 @@ const resetForm = (agent) => {
   form.model = agent?.model ?? 'glm-4.5-flash'
   form.system_prompt = agent?.system_prompt ?? agent?.systemPrompt ?? ''
   form.linkedMcpId = linkedIds[0] ?? ''
+  form.reasoning_enabled = agent?.reasoning_enabled ?? true
 }
 
 const loadAgents = async () => {
@@ -85,7 +87,8 @@ const loadAgents = async () => {
             linkedMcpIds: linkedIds,
             linkedMcpId: linkedIds[0] ?? '',
             linkedMcpCount: agent.linked_mcp_count ?? agent.linkedMcpCount ?? linkedIds.length,
-            system_prompt: agent.system_prompt ?? ''
+            system_prompt: agent.system_prompt ?? '',
+            reasoning_enabled: agent.reasoning_enabled ?? true
           }
       })
       : []
@@ -129,7 +132,8 @@ const saveAgent = async () => {
     const payload = {
       name: form.name,
       model: form.model,
-      system_prompt: form.system_prompt
+      system_prompt: form.system_prompt,
+      reasoning_enabled: form.reasoning_enabled
     }
 
     const res = await fetch(url, {
@@ -325,6 +329,12 @@ onMounted(() => {
                 ></textarea>
               </div>
             </label>
+
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" v-model="form.reasoning_enabled" class="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-900" />
+              <span class="text-sm text-slate-700">Enable Reasoning Thought</span>
+            </label>
+
             <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
               <TuiSelect
                 label="Linked MCP Server"
