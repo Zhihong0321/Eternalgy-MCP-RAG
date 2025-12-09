@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from sqlmodel import Session, select
 from typing import List
+from sqlalchemy.exc import IntegrityError
 
 from database import get_session
 from models import Agent, AgentMCPServer, MCPServer, AgentKnowledgeFile, AgentRead
@@ -48,10 +49,21 @@ def link_mcp_to_agent(agent_id: int, server_id: int, session: Session = Depends(
     server = session.get(MCPServer, server_id)
     if not server:
         raise HTTPException(status_code=404, detail="MCP Server not found")
-        
+
+    # Idempotent link: skip duplicates instead of throwing 500 on unique constraint
+    existing_link = session.get(AgentMCPServer, (agent_id, server_id))
+    if existing_link:
+        return {"message": "MCP already linked to agent"}
+
     link = AgentMCPServer(agent_id=agent_id, mcp_server_id=server_id)
     session.add(link)
-    session.commit()
+    try:
+        session.commit()
+    except IntegrityError:
+        session.rollback()
+        # Likely duplicate link raced in; treat as success to keep UI happy
+        return {"message": "MCP already linked to agent"}
+
     return {"message": "Linked successfully"}
 
 @router.post("/{agent_id}/knowledge")
