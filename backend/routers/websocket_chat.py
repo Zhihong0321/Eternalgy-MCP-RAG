@@ -87,14 +87,19 @@ async def websocket_endpoint(
                     status = await mcp_manager.get_mcp_status(str(server_id))
                     if status.get("status") == "not found":
                          # Resolve script path
-                         # Determine paths relative to this file's parent (backend/) to ensure compatibility
-                         # with different environments (Docker, Railway, Local).
-                         # This file is in routers/, so parent is backend/
                          base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
                          scripts_dir = os.getenv("MCP_SCRIPTS_DIR", os.path.join(base_dir, "mcp-runtime-scripts"))
                          full_script_path = os.path.join(scripts_dir, mcp_server_db.script)
                          
-                         await mcp_manager.spawn_mcp(str(server_id), "python", [full_script_path])
+                         # Parse env_vars
+                         env_vars = {}
+                         if mcp_server_db.env_vars:
+                             try:
+                                 env_vars = json.loads(mcp_server_db.env_vars)
+                             except Exception:
+                                 logger.warning(f"Invalid env_vars for MCP {server_id}")
+
+                         await mcp_manager.spawn_mcp(str(server_id), "python", [full_script_path], env=env_vars)
                 
                 server_tools = await mcp_manager.list_mcp_tools(str(server_id))
                 for tool in server_tools:
@@ -111,6 +116,11 @@ async def websocket_endpoint(
                     tool_map[tool_def["name"]] = str(server_id)
             except Exception as e:
                 logger.warning(f"Error loading tools for server {server_id}: {e}")
+                # Notify client of the error
+                await manager.send_json(websocket, {
+                    "type": "token", 
+                    "content": f"\n\n[System Warning: Failed to load MCP tools for '{mcp_server_db.name if mcp_server_db else server_id}'. Error: {str(e)}]\n\n"
+                })
 
         # 4. Message Loop
         messages = [{"role": "system", "content": final_system_prompt}]
