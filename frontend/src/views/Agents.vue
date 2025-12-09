@@ -247,208 +247,17 @@ const handleFileUpload = async (event) => {
   }
 }
 
-const modelOptions = [
-  { label: 'glm-4.5-flash', value: 'glm-4.5-flash' },
-  { label: 'glm-4.6', value: 'glm-4.6' },
-  { label: 'claude-3.5', value: 'claude-3.5' },
-  { label: 'gpt-4o-mini', value: 'gpt-4o-mini' }
-]
-
-const form = reactive({
-  id: null,
-  name: '',
-  model: 'glm-4.5-flash',
-  system_prompt: '',
-  linkedMcpId: '',
-  reasoning_enabled: true
-})
-
-const statusVariant = (status) => {
-  const normalized = (status || '').toLowerCase()
-  if (normalized === 'live' || normalized === 'active' || normalized === 'ready') return 'success'
-  if (normalized === 'watch' || normalized === 'syncing' || normalized === 'cooldown') return 'warning'
-  return 'muted'
-}
-
-const formatTokens = (value) => {
-  const num = Number(value)
-  if (Number.isNaN(num)) return value || '—'
-  if (num >= 1_000_000) return `${(num / 1_000_000).toFixed(1)}M`
-  if (num >= 1_000) return `${(num / 1_000).toFixed(1)}K`
-  return `${num}`
-}
-
-const extractLinkedMcpIds = (agent) => {
-  if (!agent) return []
-  if (Array.isArray(agent.linked_mcp_ids)) return agent.linked_mcp_ids
-  if (Array.isArray(agent.linkedMcpIds)) return agent.linkedMcpIds
-  if (agent.linkedMcpId) return [agent.linkedMcpId]
-  if (agent.linked_mcp_id) return [agent.linked_mcp_id]
-  return []
-}
-
-const resetForm = (agent) => {
-  const linkedIds = extractLinkedMcpIds(agent)
-  form.id = agent?.id ?? null
-  form.name = agent?.name ?? ''
-  form.model = agent?.model ?? 'glm-4.5-flash'
-  form.system_prompt = agent?.system_prompt ?? agent?.systemPrompt ?? ''
-  form.linkedMcpId = linkedIds[0] ?? ''
-  form.reasoning_enabled = agent?.reasoning_enabled ?? true
-}
-
-const loadAgents = async () => {
-  isLoading.value = true
-  message.value = ''
+const deleteKnowledgeFile = async (fileId) => {
+  if (!confirm('Delete this file?')) return
   try {
-    const res = await fetch(`${API_BASE}/agents/`)
-    if (!res.ok) throw new Error('Failed to fetch agents')
-    const data = await res.json()
-    agents.value = Array.isArray(data)
-      ? data.map((agent, index) => {
-          const linkedIds = extractLinkedMcpIds(agent)
-          return {
-            id: agent.id ?? index,
-            name: agent.name ?? 'Unknown Agent',
-            model: agent.model ?? 'n/a',
-            status: (agent.status ?? 'ready').toLowerCase(),
-            lastActive: agent.lastActive ?? agent.last_active ?? '—',
-            tokenCountToday: agent.tokenCountToday ?? agent.token_count_today ?? 0,
-            linkedMcpIds: linkedIds,
-            linkedMcpId: linkedIds[0] ?? '',
-            linkedMcpCount: agent.linked_mcp_count ?? agent.linkedMcpCount ?? linkedIds.length,
-            system_prompt: agent.system_prompt ?? '',
-            reasoning_enabled: agent.reasoning_enabled ?? true
-          }
-      })
-      : []
-  } catch (error) {
-    console.error('Failed to load agents', error)
-    message.value = 'Failed to load agents from API.'
-    agents.value = []
-  } finally {
-    isLoading.value = false
-  }
-}
-
-const loadMcpServers = async () => {
-  mcpLoading.value = true
-  try {
-    const res = await fetch(`${API_BASE}/mcp/servers`)
-    if (!res.ok) throw new Error('Failed to fetch mcp servers')
-    const data = await res.json()
-    mcpServers.value = Array.isArray(data)
-      ? data.map((server, index) => ({
-          id: server.id ?? index,
-          name: server.name ?? 'server',
-          status: (server.status ?? 'online').toLowerCase(),
-          endpoint: server.endpoint ?? server.script ?? ''
-      }))
-      : []
-  } catch (error) {
-    console.error('Failed to load mcp servers', error)
-    mcpServers.value = []
-  } finally {
-    mcpLoading.value = false
-  }
-}
-
-const saveAgent = async () => {
-  isSaving.value = true
-  message.value = ''
-  try {
-    const method = form.id ? 'PUT' : 'POST'
-    const url = form.id ? `${API_BASE}/agents/${form.id}` : `${API_BASE}/agents/`
-    const payload = {
-      name: form.name,
-      model: form.model,
-      system_prompt: form.system_prompt,
-      reasoning_enabled: form.reasoning_enabled
-    }
-
-    const res = await fetch(url, {
-      method,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
+    const res = await fetch(`${API_BASE}/agents/${form.id}/knowledge/${fileId}`, {
+      method: 'DELETE'
     })
-
-    if (!res.ok) throw new Error('Failed to save agent')
-    message.value = form.id ? 'Agent updated' : 'Agent created'
-    await loadAgents()
-    if (!form.id) resetForm()
+    if (!res.ok) throw new Error('Failed to delete file')
+    await loadKnowledgeFiles(form.id)
   } catch (error) {
-    console.error('Save agent failed', error)
-    message.value = 'Save failed. Check API connectivity.'
-  } finally {
-    isSaving.value = false
-  }
-}
-
-const deleteAgent = async (agentId) => {
-  if (!agentId) return
-  const confirmDelete = window.confirm('Delete this agent? This action cannot be undone.')
-  if (!confirmDelete) return
-
-  deletingAgentId.value = agentId
-  message.value = ''
-  try {
-    const res = await fetch(`${API_BASE}/agents/${agentId}`, { method: 'DELETE' })
-    if (!res.ok) throw new Error('Failed to delete agent')
-    message.value = 'Agent deleted.'
-    await loadAgents()
-    if (form.id === agentId) resetForm()
-  } catch (error) {
-    console.error('Delete agent failed', error)
-    message.value = 'Delete failed. Confirm backend DELETE /agents/{id} is available.'
-  } finally {
-    deletingAgentId.value = null
-  }
-}
-
-const linkMcp = async () => {
-  if (!form.id || !form.linkedMcpId) {
-    message.value = 'Select an agent and MCP to link.'
-    return
-  }
-
-  try {
-    const res = await fetch(`${API_BASE}/agents/${form.id}/link-mcp/${form.linkedMcpId}`, {
-      method: 'POST'
-    })
-    if (!res.ok) throw new Error('Failed to link MCP')
-    message.value = 'MCP linked to agent.'
-    await loadAgents()
-  } catch (error) {
-    console.error('Link MCP failed', error)
-    message.value = 'Link failed. Confirm backend endpoint.'
-  }
-}
-
-const handleFileUpload = async (event) => {
-  const file = event.target.files?.[0]
-  if (!file || !form.id) {
-    message.value = 'Select an agent before uploading.'
-    event.target.value = ''
-    return
-  }
-
-  isUploading.value = true
-  message.value = ''
-  try {
-    const formData = new FormData()
-    formData.append('file', file)
-    const res = await fetch(`${API_BASE}/agents/${form.id}/knowledge`, {
-      method: 'POST',
-      body: formData
-    })
-    if (!res.ok) throw new Error('Failed to upload file')
-    message.value = 'File uploaded to agent knowledge.'
-  } catch (error) {
-    console.error('Upload failed', error)
-    message.value = 'Upload failed. Verify backend handler.'
-  } finally {
-    isUploading.value = false
-    event.target.value = ''
+    console.error('Delete file failed', error)
+    message.value = 'Failed to delete file.'
   }
 }
 
@@ -597,7 +406,12 @@ onMounted(() => {
                     <svg class="h-4 w-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                     </svg>
-                    <span class="truncate">{{ file.filename }}</span>
+                    <span class="truncate flex-1">{{ file.filename }}</span>
+                    <button @click="deleteKnowledgeFile(file.id)" class="ml-auto text-red-400 hover:text-red-600 cursor-pointer p-1" title="Delete file">
+                      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                    </button>
                   </li>
                 </ul>
                 <p v-else class="text-xs text-slate-400 italic">No files attached.</p>

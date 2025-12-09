@@ -120,3 +120,13 @@ def list_agent_knowledge(agent_id: int, session: Session = Depends(get_session))
     
     files = session.exec(select(AgentKnowledgeFile).where(AgentKnowledgeFile.agent_id == agent_id)).all()
     return files
+
+@router.delete("/{agent_id}/knowledge/{file_id}")
+def delete_agent_knowledge(agent_id: int, file_id: int, session: Session = Depends(get_session)):
+    file = session.get(AgentKnowledgeFile, file_id)
+    if not file or file.agent_id != agent_id:
+        raise HTTPException(status_code=404, detail="File not found for this agent")
+    
+    session.delete(file)
+    session.commit()
+    return {"message": "File deleted"}
