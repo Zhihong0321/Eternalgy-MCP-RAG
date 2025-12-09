@@ -47,33 +47,42 @@ app.add_middleware(
 
 def seed_mcp_scripts():
     """Seeds initial MCP scripts to the persistent volume if missing."""
-    scripts_dir = os.getenv("MCP_SCRIPTS_DIR", "/app/scripts")
-    initial_dir = "/app/initial_mcp_servers"
+    scripts_dir = os.getenv("MCP_SCRIPTS_DIR", "/app/mcp-runtime-scripts")
+    initial_dir = "/app/mcp_servers"
     
     # Create target dir if it doesn't exist (it should be a volume, but just in case)
     os.makedirs(scripts_dir, exist_ok=True)
     
     if os.path.exists(initial_dir):
         logger.info(f"Seeding MCP scripts from {initial_dir} to {scripts_dir}...")
-        for filename in os.listdir(initial_dir):
-            if filename.endswith(".py"):
-                src = os.path.join(initial_dir, filename)
-                dst = os.path.join(scripts_dir, filename)
-                
-                if not os.path.exists(dst):
+        for item_name in os.listdir(initial_dir):
+            src_path = os.path.join(initial_dir, item_name)
+            dst_path = os.path.join(scripts_dir, item_name)
+
+            if os.path.isdir(src_path):
+                if not os.path.exists(dst_path):
                     try:
-                        shutil.copy2(src, dst)
-                        logger.info(f"Seeded {filename}")
+                        shutil.copytree(src_path, dst_path)
+                        logger.info(f"Seeded directory {item_name}")
                     except Exception as e:
-                        logger.error(f"Failed to seed {filename}: {e}")
+                        logger.error(f"Failed to seed directory {item_name}: {e}")
                 else:
-                    logger.debug(f"{filename} already exists, skipping.")
+                    logger.debug(f"Directory {item_name} already exists, skipping.")
+            elif os.path.isfile(src_path) and (item_name.endswith(".py") or item_name.endswith(".json")):
+                if not os.path.exists(dst_path):
+                    try:
+                        shutil.copy2(src_path, dst_path)
+                        logger.info(f"Seeded file {item_name}")
+                    except Exception as e:
+                        logger.error(f"Failed to seed file {item_name}: {e}")
+                else:
+                    logger.debug(f"File {item_name} already exists, skipping.")
     else:
         logger.warning(f"Initial MCP directory {initial_dir} not found. Skipping seeding.")
 
 @app.on_event("startup")
 async def on_startup():
-    # create_db_and_tables() # Disabled for production safety
+    create_db_and_tables() # Enabled for development
     seed_mcp_scripts()
     # Load Z.ai Key from DB if exists
     try:

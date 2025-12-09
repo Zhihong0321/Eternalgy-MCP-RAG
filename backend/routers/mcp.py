@@ -79,12 +79,15 @@ async def start_mcp_server(server_id: int, session: Session = Depends(get_sessio
     if not server:
         raise HTTPException(status_code=404, detail="Server not found")
 
-    scripts_dir = os.getenv("MCP_SCRIPTS_DIR", "/app/scripts")
-    script_filename = os.path.basename(server.script)
-    script_path = os.path.join(scripts_dir, script_filename)
+    scripts_dir = os.getenv("MCP_SCRIPTS_DIR", "/app/mcp-runtime-scripts")
+    # Correctly resolve the script path, supporting subdirectories
+    full_script_path_in_scripts_dir = os.path.join(scripts_dir, server.script)
+    
+    logger.info(f"Attempting to start MCP {server_id}. Script path: {full_script_path_in_scripts_dir}")
+    logger.info(f"os.path.exists({full_script_path_in_scripts_dir}): {os.path.exists(full_script_path_in_scripts_dir)}")
 
-    if not os.path.exists(script_path):
-         raise HTTPException(status_code=404, detail=f"Script file not found: {script_filename}")
+    if not os.path.exists(full_script_path_in_scripts_dir):
+         raise HTTPException(status_code=404, detail=f"Script file not found: {server.script}")
     
     # Parse env_vars
     try:
@@ -97,17 +100,17 @@ async def start_mcp_server(server_id: int, session: Session = Depends(get_sessio
         args = json.loads(server.args) if server.args else []
         if not isinstance(args, list):
              # Fallback if it was just a string in old db
-             args = [server.script]
+             args = [server.script] # Use the original server.script for arg if fallback
     except json.JSONDecodeError:
         # Fallback
-        args = [server.script]
+        args = [server.script] # Use the original server.script for arg if fallback
     
-    # If args is empty, default to [script_path] (absolute path)
-    if not args and server.script:
-        args = [script_path]
-    elif args and args[0] == server.script:
+    # If args is empty and command is python, default to full_script_path_in_scripts_dir
+    if not args and server.command == "python":
+        args = [full_script_path_in_scripts_dir]
+    elif args and server.command == "python" and args[0] == server.script:
         # If the first arg is just the filename, replace with absolute path to be safe
-        args[0] = script_path
+        args[0] = full_script_path_in_scripts_dir
 
     try:
         result = await mcp_manager.spawn_mcp(

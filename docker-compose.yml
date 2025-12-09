@@ -17,10 +17,7 @@ services:
         condition: service_started
     env_file:
       - ./backend/.env
-    environment:
-      - REDIS_URL=redis://redis:6379/0
-    volumes:
-      - mcp_scripts:/app/scripts
+    volumes: []
   db:
     image: postgres:15
     restart: always
@@ -44,4 +41,3 @@ services:
 
 volumes:
   postgres_data:
-  mcp_scripts:
