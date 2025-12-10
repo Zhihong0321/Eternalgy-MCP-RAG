@@ -1,26 +1,32 @@
-# Start with a Python 3.12 base image
-FROM python:3.12-slim
+# ---------- Frontend build (multi-stage) ----------
+FROM node:20-bookworm-slim AS frontend-build
+WORKDIR /app/frontend
+COPY frontend/package*.json ./
+RUN npm ci
+COPY frontend/ .
+RUN npm run build
 
-# Set the working directory in the container
+# ---------- Backend runtime ----------
+FROM python:3.12-slim
 WORKDIR /app
 
-# Copy the backend requirements file and install dependencies
+# Install backend dependencies
 COPY backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Add a default unprivileged user.
 RUN useradd --no-create-home appuser
 
-# Copy the backend code
+# Copy backend code
 COPY backend/ .
+
+# Copy built frontend assets into the location FastAPI serves from
+COPY --from=frontend-build /app/frontend/dist ./frontend-dist
 
 # Change ownership of the application directory to the non-root user
 RUN chown -R appuser:appuser /app
 
 USER appuser
 
-# Expose the port the app runs on
 EXPOSE 8000
-
-# Command to run the application
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
