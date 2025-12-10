@@ -156,13 +156,13 @@ onMounted(() => {
 
 <template>
   <div class="relative min-h-screen">
-    <main class="relative z-10 mx-auto w-full max-w-5xl px-4 py-8 sm:px-6 lg:px-10 space-y-8">
-      <header class="tui-surface rounded-xl border border-slate-200 p-6">
+    <main class="relative z-10 mx-auto w-full max-w-5xl px-2 py-6 sm:px-4 lg:px-8 space-y-0">
+      <header class="tui-surface border border-[var(--border)] px-6 py-5">
         <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div class="space-y-2">
-            <p class="text-xs uppercase tracking-[0.32em] text-slate-500">z.ai admin</p>
-            <h1 class="text-3xl font-bold text-slate-900">Chat Tester</h1>
-            <p class="text-sm text-slate-600">
+            <p class="text-xs uppercase tracking-[0.32em] text-[var(--muted)]">z.ai admin</p>
+            <h1 class="text-3xl font-bold text-[var(--text)]">Chat Tester</h1>
+            <p class="text-sm text-[var(--muted)]">
               Select an agent, review prior messages, and start a new chat session. Mobile-friendly layout for testers.
             </p>
             <div class="flex flex-wrap items-center gap-2">
@@ -170,14 +170,14 @@ onMounted(() => {
               <TuiBadge variant="muted">base: dynamic (current host)</TuiBadge>
             </div>
           </div>
-          <div class="flex flex-wrap items-center gap-2">
+          <div class="flex flex-wrap items-center gap-2 text-xs text-[var(--muted)]">
             <TuiButton size="sm" variant="outline" @click="startNewChat" :disabled="!currentAgentId">Start new chat</TuiButton>
             <TuiButton size="sm" variant="outline" @click="loadAgents">Refresh agents</TuiButton>
           </div>
         </div>
       </header>
 
-      <section class="space-y-4">
+      <section class="border border-[var(--border)] px-6 py-5">
         <div class="grid gap-4 sm:grid-cols-[1.4fr_1fr]">
           <TuiSelect
             label="Agent"
@@ -194,23 +194,23 @@ onMounted(() => {
             <TuiBadge variant="muted">agents: {{ agents.length }}</TuiBadge>
           </div>
         </div>
-        <p v-if="agentError" class="text-xs text-red-600">{{ agentError }}</p>
+        <p v-if="agentError" class="mt-2 text-xs text-red-600">{{ agentError }}</p>
       </section>
 
-      <section class="grid gap-4 lg:grid-cols-[1.4fr_1fr]">
-        <div class="tui-surface rounded-xl border border-slate-200 p-4 sm:p-5">
+      <section class="grid lg:grid-cols-[1.4fr_1fr]">
+        <div class="tui-surface border border-[var(--border)] px-5 py-5">
           <header class="mb-3 flex items-center justify-between">
             <div>
-              <p class="text-[11px] uppercase tracking-[0.2em] text-slate-500">conversation</p>
-              <h2 class="text-xl font-semibold text-slate-900">{{ currentAgent?.name || 'Select an agent' }}</h2>
+              <p class="text-[11px] uppercase tracking-[0.2em] text-[var(--muted)]">conversation</p>
+              <h2 class="text-xl font-semibold text-[var(--text)]">{{ currentAgent?.name || 'Select an agent' }}</h2>
             </div>
             <TuiBadge v-if="currentAgent" variant="muted">{{ currentAgent.model }}</TuiBadge>
           </header>
 
             <div
-              class="flex flex-col gap-3 rounded-lg border border-slate-200 bg-white p-3 sm:p-4 max-h-[60vh] overflow-y-auto"
+              class="flex flex-col gap-3 border border-[var(--border)] bg-white p-3 sm:p-4 max-h-[60vh] overflow-y-auto"
             >
-              <p v-if="!currentAgentId" class="text-sm text-slate-600">Choose an agent to view chat history.</p>
+              <p v-if="!currentAgentId" class="text-sm text-[var(--muted)]">Choose an agent to view chat history.</p>
               <div v-else>
                 <div
                   v-for="(message, idx) in currentConversation"
@@ -222,16 +222,16 @@ onMounted(() => {
                 >
                   <div
                     :class="[
-                      'max-w-full rounded-lg border px-3 py-2 text-sm sm:max-w-[75%]',
+                      'max-w-full border px-3 py-2 text-sm sm:max-w-[75%]',
                       message.role === 'user'
-                        ? 'border-slate-900 bg-slate-900 text-white'
-                        : 'border-slate-200 bg-white text-slate-900'
+                        ? 'border-[#ff8200] bg-[var(--accent-soft)] text-[var(--text)]'
+                        : 'border-[var(--border)] bg-white text-[var(--text)]'
                     ]"
                   >
-                    <p class="text-[11px] uppercase tracking-[0.16em] text-slate-500" v-if="message.role === 'assistant'">
+                    <p class="text-[11px] uppercase tracking-[0.16em] text-[var(--muted)]" v-if="message.role === 'assistant'">
                       {{ currentAgent?.name || 'agent' }}
                     </p>
-                    <p class="text-[11px] uppercase tracking-[0.16em] text-white/80" v-else>
+                    <p class="text-[11px] uppercase tracking-[0.16em] text-[var(--muted)]" v-else>
                       you
                     </p>
                     <p class="whitespace-pre-wrap leading-relaxed">
@@ -240,7 +240,7 @@ onMounted(() => {
                   </div>
                 </div>
                 <div v-if="isSending" class="flex justify-start">
-                   <div class="max-w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-500 italic">
+                   <div class="max-w-full border border-[var(--border)] bg-white px-3 py-2 text-sm text-[var(--muted)] italic">
                       Thinking...
                    </div>
                 </div>
@@ -248,10 +248,10 @@ onMounted(() => {
             </div>
 
             <div class="mt-4 space-y-3">
-            <label class="flex flex-col gap-2 text-sm text-slate-800">
+            <label class="flex flex-col gap-2 text-sm text-[var(--text)]">
               <div class="flex items-center justify-between">
-                <span class="text-[11px] uppercase tracking-[0.2em] text-slate-600">message</span>
-                <span class="text-[11px] text-slate-500">agent: {{ currentAgent?.name || 'none' }}</span>
+                <span class="text-[11px] uppercase tracking-[0.2em] text-[var(--muted)]">message</span>
+                <span class="text-[11px] text-[var(--muted)]">agent: {{ currentAgent?.name || 'none' }}</span>
               </div>
               <div class="relative breathing-ring">
                 <textarea
@@ -259,32 +259,32 @@ onMounted(() => {
                   rows="3"
                   :disabled="!currentAgentId || isSending"
                   placeholder="Type a message to the agent. Press Send to dispatch."
-                  class="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 shadow-[inset_0_1px_1px_rgba(15,23,42,0.06)] focus:border-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-200 disabled:cursor-not-allowed disabled:bg-slate-100"
+                  class="w-full rounded-none border border-[var(--border-strong)] bg-white px-3 py-2 text-sm text-[var(--text)] focus:border-[var(--text)] focus:outline-none focus:ring-2 focus:ring-[rgba(31,31,31,0.12)] disabled:cursor-not-allowed disabled:bg-[var(--bg)]"
                 ></textarea>
               </div>
             </label>
-            <div class="flex flex-wrap items-center gap-3">
-              <TuiButton :loading="isSending" @click="sendMessage" :disabled="!currentAgentId || isSending">
+            <div class="mt-3 flex flex-wrap items-center gap-2">
+              <TuiButton size="md" :loading="isSending" @click="sendMessage" :disabled="!currentAgentId || isSending">
                 Send
               </TuiButton>
-              <TuiButton variant="outline" @click="startNewChat" :disabled="!currentAgentId">New chat</TuiButton>
-              <p class="text-xs text-slate-600">POST /chat/ with agent_id + message</p>
+              <TuiButton size="md" variant="outline" @click="startNewChat" :disabled="!currentAgentId">New chat</TuiButton>
+              <p class="text-xs text-[var(--muted)]">POST /chat/ with agent_id + message</p>
             </div>
           </div>
         </div>
 
-        <div class="tui-surface rounded-xl border border-slate-200 p-4 sm:p-5 space-y-4">
+        <div class="tui-surface border border-[var(--border)] px-5 py-5 space-y-4">
           <div>
-            <p class="text-[11px] uppercase tracking-[0.2em] text-slate-500">tester notes</p>
-            <h3 class="text-lg font-semibold text-slate-900">Session Controls</h3>
-            <ul class="mt-2 space-y-2 text-sm text-slate-700">
+            <p class="text-[11px] uppercase tracking-[0.2em] text-[var(--muted)]">tester notes</p>
+            <h3 class="text-lg font-semibold text-[var(--text)]">Session Controls</h3>
+            <ul class="mt-2 space-y-2 text-sm text-[var(--muted)]">
               <li>- Select an agent to auto-create a tester chat.</li>
               <li>- Start a new chat to reset conversation for that agent.</li>
               <li>- Mobile layout stacks controls for thumb reach.</li>
             </ul>
           </div>
-          <div class="rounded-lg border border-slate-200 bg-white p-3 text-xs text-slate-700 space-y-1">
-        <p><strong>Base URL</strong>: {window.location.origin}/api/v1</p>
+          <div class="border border-[var(--border)] bg-white p-3 text-xs text-[var(--text)] space-y-1">
+            <p><strong>Base URL</strong>: {window.location.origin}/api/v1</p>
             <p><strong>Send</strong>: POST /chat/</p>
             <p><strong>Agents</strong>: GET /agents/</p>
             <p><strong>Fallback</strong>: local messages if API is down.</p>

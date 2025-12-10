@@ -1,9 +1,64 @@
-Traceback (most recent call last):
-  File "/home/mastercoder/better-cli-workspace/ZAI-Chatbot/backend/main.py", line 9, in <module>
-    from dependencies import mcp_manager # Use the shared instance
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/mastercoder/better-cli-workspace/ZAI-Chatbot/backend/dependencies.py", line 2, in <module>
-    from mcp_manager import MCPManager
-  File "/home/mastercoder/better-cli-workspace/ZAI-Chatbot/backend/mcp_manager.py", line 6, in <module>
-    from mcp.client.stdio import stdio_client
-ModuleNotFoundError: No module named 'mcp'
+/home/mastercoder/better-cli-workspace/ZAI-Chatbot/backend/main.py:82: DeprecationWarning: 
+        on_event is deprecated, use lifespan event handlers instead.
+
+        Read more about it in the
+        [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+        
+  @app.on_event("startup")
+/home/mastercoder/better-cli-workspace/ZAI-Chatbot/backend/main.py:96: DeprecationWarning: 
+        on_event is deprecated, use lifespan event handlers instead.
+
+        Read more about it in the
+        [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+        
+  @app.on_event("shutdown")
+INFO:     Started server process [39241]
+INFO:     Waiting for application startup.
+INFO:__main__:Syncing MCP scripts from /home/mastercoder/better-cli-workspace/ZAI-Chatbot/backend/mcp_servers to /home/mastercoder/better-cli-workspace/ZAI-Chatbot/backend/mcp-runtime-scripts-test...
+INFO:__main__:Synced file billing_mcp.py
+INFO:__main__:Synced directory billing-mcp-server-v2
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8001 (Press CTRL+C to quit)
+INFO:     127.0.0.1:44968 - "GET /api/v1/health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:44976 - "GET /api/v1/agents/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:44990 - "POST /api/v1/agents/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45006 - "POST /api/v1/mcp/servers HTTP/1.1" 200 OK
+INFO:routers.mcp:Attempting to start MCP 1. Script path: /home/mastercoder/better-cli-workspace/ZAI-Chatbot/backend/mcp-runtime-scripts-test/billing-mcp-server-v2/main.py
+INFO:routers.mcp:os.path.exists(/home/mastercoder/better-cli-workspace/ZAI-Chatbot/backend/mcp-runtime-scripts-test/billing-mcp-server-v2/main.py): True
+INFO:mcp_manager:Registering MCP 1 config: command=python, args=['/home/mastercoder/better-cli-workspace/ZAI-Chatbot/backend/mcp-runtime-scripts-test/billing-mcp-server-v2/main.py'], cwd=/app
+INFO:mcp_manager:MCP config 1 registered successfully.
+INFO:     127.0.0.1:45020 - "POST /api/v1/mcp/servers/1/start HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45030 - "POST /api/v1/agents/1/link-mcp/1 HTTP/1.1" 200 OK
+INFO:mcp_manager:Spawning temporary process to call tool 'calculate_solar_impact' on MCP 1 with args: {'rm': 300}
+ERROR:mcp_manager:Error calling tool calculate_solar_impact on MCP 1: [Errno 2] No such file or directory
+ERROR:mcp_manager:Traceback (most recent call last):
+  File "/home/mastercoder/better-cli-workspace/ZAI-Chatbot/backend/mcp_manager.py", line 110, in call_mcp_tool
+    async with stdio_client(server_params) as (read, write):
+  File "/usr/lib/python3.12/contextlib.py", line 210, in __aenter__
+    return await anext(self.gen)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/mastercoder/better-cli-workspace/ZAI-Chatbot/backend/.venv/lib/python3.12/site-packages/mcp/client/stdio/__init__.py", line 124, in stdio_client
+    process = await _create_platform_compatible_process(
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/mastercoder/better-cli-workspace/ZAI-Chatbot/backend/.venv/lib/python3.12/site-packages/mcp/client/stdio/__init__.py", line 251, in _create_platform_compatible_process
+    process = await anyio.open_process(
+              ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/mastercoder/better-cli-workspace/ZAI-Chatbot/backend/.venv/lib/python3.12/site-packages/anyio/_core/_subprocesses.py", line 190, in open_process
+    return await get_async_backend().open_process(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/mastercoder/better-cli-workspace/ZAI-Chatbot/backend/.venv/lib/python3.12/site-packages/anyio/_backends/_asyncio.py", line 2628, in open_process
+    process = await asyncio.create_subprocess_exec(
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/asyncio/subprocess.py", line 224, in create_subprocess_exec
+    transport, protocol = await loop.subprocess_exec(
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "uvloop/loop.pyx", line 2841, in subprocess_exec
+  File "uvloop/loop.pyx", line 2799, in __subprocess_run
+  File "uvloop/handles/process.pyx", line 611, in uvloop.loop.UVProcessTransport.new
+  File "uvloop/handles/process.pyx", line 112, in uvloop.loop.UVProcess._init
+FileNotFoundError: [Errno 2] No such file or directory
+
+INFO:     127.0.0.1:45034 - "POST /api/v1/mcp/servers/1/call/calculate_solar_impact HTTP/1.1" 500 Internal Server Error
+INFO:mcp_manager:Removing MCP config 1.
+INFO:     127.0.0.1:45038 - "DELETE /api/v1/mcp/servers/1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45042 - "DELETE /api/v1/agents/1 HTTP/1.1" 200 OK

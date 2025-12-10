@@ -10,17 +10,17 @@ const props = defineProps({
 
 const variants = {
   success:
-    'border-slate-900 bg-slate-900 text-white',
+    'border-[#1f1f1f] bg-[#1f1f1f] text-white',
   info:
-    'border-slate-600 bg-slate-100 text-slate-900',
+    'border-[var(--border-strong)] bg-white text-[var(--text)]',
   warning:
-    'border-slate-400 bg-slate-50 text-slate-700',
+    'border-[var(--border-strong)] bg-[var(--accent-soft)] text-[var(--text)]',
   muted:
-    'border-slate-300 bg-white text-slate-700'
+    'border-[var(--border)] bg-white text-[var(--muted)]'
 }
 
 const classes = computed(() => [
-  'inline-flex items-center gap-2 rounded-md border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.18em]',
+  'inline-flex items-center gap-2 rounded-none border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.18em]',
   variants[props.variant] || variants.muted
 ])
 </script>

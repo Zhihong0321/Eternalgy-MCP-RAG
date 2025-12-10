@@ -1,23 +1,33 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import TuiBadge from '../components/ui/TuiBadge.vue'
 import TuiButton from '../components/ui/TuiButton.vue'
+import TuiCard from '../components/ui/TuiCard.vue'
+import TuiSelect from '../components/ui/TuiSelect.vue'
 
 const API_BASE = `${window.location.origin}/api/v1`
 
-const agents = ref([])
-const threads = ref([])
-const isLoadingAgents = ref(true)
-const isLoadingThreads = ref(true)
-const agentError = ref('')
-const threadError = ref('')
+const router = useRouter()
+const origin = window.location.origin
 
-const statusVariant = (status) => {
-  const normalized = (status || '').toLowerCase()
-  if (normalized === 'live' || normalized === 'active' || normalized === 'ready') return 'success'
-  if (normalized === 'watch' || normalized === 'syncing' || normalized === 'listening' || normalized === 'cooldown') return 'warning'
-  return 'muted'
-}
+const agents = ref([])
+const mcps = ref([])
+const health = ref(null)
+
+const isLoadingAgents = ref(true)
+const isLoadingMcps = ref(true)
+const isLoadingHealth = ref(false)
+const agentError = ref('')
+const mcpError = ref('')
+const message = ref('')
+const togglingMcpId = ref(null)
+
+const quickAgentId = ref('')
+const quickComposer = ref('')
+const quickSending = ref(false)
+const quickLog = ref([])
+const quickStatus = ref('idle')
 
 const formatTokens = (value) => {
   const num = Number(value)
@@ -27,12 +37,37 @@ const formatTokens = (value) => {
   return `${num}`
 }
 
-const lastActiveThreads = computed(() => threads.value.slice(0, 10))
-const totalAgents = computed(() => agents.value.length)
-const activeThreadsCount = computed(() => lastActiveThreads.value.length)
-const totalTokensToday = computed(() =>
-  agents.value.reduce((acc, agent) => acc + (Number(agent.tokenCountToday) || 0), 0)
+const statusVariant = (status) => {
+  const normalized = (status || '').toLowerCase()
+  if (['live', 'active', 'ready', 'online', 'running', 'connected'].includes(normalized)) return 'success'
+  if (['watch', 'syncing', 'cooldown', 'tool', 'warning'].includes(normalized)) return 'warning'
+  return 'muted'
+}
+
+const agentOptions = computed(() =>
+  agents.value.map((agent) => ({
+    label: agent.name,
+    value: String(agent.id)
+  }))
 )
+
+const metrics = computed(() => {
+  const readyAgents = agents.value.filter((a) => ['ready', 'live', 'active'].includes((a.status || '').toLowerCase()))
+  const runningMcps = mcps.value.filter((m) =>
+    ['ready', 'online', 'running', 'connected'].includes((m.status || '').toLowerCase())
+  )
+  const tokensToday = agents.value.reduce((acc, agent) => acc + (Number(agent.tokenCountToday) || 0), 0)
+
+  return {
+    totalAgents: agents.value.length,
+    readyAgents: readyAgents.length,
+    tokensToday,
+    mcps: mcps.value.length,
+    runningMcps: runningMcps.length
+  }
+})
+
+const topAgents = computed(() => agents.value.slice(0, 4))
 
 const loadAgents = async () => {
   isLoadingAgents.value = true
@@ -51,6 +86,9 @@ const loadAgents = async () => {
           tokenCountToday: agent.tokenCountToday ?? agent.token_count_today ?? 0
         }))
       : []
+    if (!quickAgentId.value && agents.value.length) {
+      quickAgentId.value = String(agents.value[0].id)
+    }
   } catch (error) {
     console.error('Failed to load agents', error)
     agentError.value = 'Failed to load agents from API.'
@@ -60,215 +98,344 @@ const loadAgents = async () => {
   }
 }
 
-const loadThreads = async () => {
-  isLoadingThreads.value = true
-  threadError.value = ''
+const loadMcps = async () => {
+  isLoadingMcps.value = true
+  mcpError.value = ''
   try {
-    const res = await fetch(`${API_BASE}/threads?limit=10&status=active`)
-    if (!res.ok) throw new Error('Failed to fetch threads')
+    const res = await fetch(`${API_BASE}/mcp/servers`)
+    if (!res.ok) throw new Error('Failed to fetch servers')
     const data = await res.json()
-    threads.value = Array.isArray(data)
-      ? data.map((thread, index) => ({
-          id: thread.id ?? index,
-          title: thread.title ?? thread.name ?? 'Thread',
-          agent: thread.agent ?? thread.agent_name ?? 'unknown',
-          lastActive: thread.lastActive ?? thread.last_active ?? '—',
-          tokensUsed: thread.tokensUsed ?? thread.tokens_used ?? 0,
-          status: (thread.status ?? 'active').toLowerCase()
+    mcps.value = Array.isArray(data)
+      ? data.map((server, index) => ({
+          id: server.id ?? index,
+          name: server.name ?? 'server',
+          status: (server.status ?? 'stopped').toLowerCase(),
+          endpoint: server.endpoint ?? server.script ?? '',
+          last_error: server.last_error,
+          last_heartbeat: server.last_heartbeat
         }))
       : []
   } catch (error) {
-    console.error('Failed to load threads', error)
-    threadError.value = 'Failed to load threads from API.'
-    threads.value = []
+    console.error('Failed to load mcp servers', error)
+    mcpError.value = 'Failed to load MCP servers.'
+    mcps.value = []
   } finally {
-    isLoadingThreads.value = false
+    isLoadingMcps.value = false
   }
 }
 
-onMounted(() => {
+const loadHealth = async () => {
+  isLoadingHealth.value = true
+  try {
+    const res = await fetch(`${API_BASE}/health`)
+    if (!res.ok) throw new Error('Failed to fetch health')
+    health.value = await res.json()
+  } catch (error) {
+    console.error('Failed to load health', error)
+    health.value = { api_status: 'error', database_status: { ok: false, message: 'Health check failed' } }
+  } finally {
+    isLoadingHealth.value = false
+  }
+}
+
+const refreshAll = () => {
   loadAgents()
-  loadThreads()
+  loadMcps()
+  loadHealth()
+}
+
+const sendQuickMessage = async () => {
+  if (!quickAgentId.value || !quickComposer.value.trim()) {
+    message.value = 'Select an agent and enter a message.'
+    return
+  }
+
+  const agentId = parseInt(quickAgentId.value, 10)
+  const text = quickComposer.value.trim()
+  quickComposer.value = ''
+  quickSending.value = true
+  quickStatus.value = 'sending'
+  message.value = ''
+
+  const entryTs = new Date().toISOString()
+  quickLog.value.push({ role: 'user', text, ts: entryTs })
+
+  try {
+    const res = await fetch(`${API_BASE}/chat/`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ agent_id: agentId, message: text })
+    })
+    if (!res.ok) throw new Error('Chat request failed')
+    const data = await res.json()
+    quickLog.value.push({
+      role: 'assistant',
+      text: data.response || 'No response text.',
+      ts: new Date().toISOString()
+    })
+    quickStatus.value = 'idle'
+  } catch (error) {
+    console.error('Quick chat failed', error)
+    quickStatus.value = 'error'
+    quickLog.value.push({
+      role: 'assistant',
+      text: 'Send failed. Check backend connectivity.',
+      ts: new Date().toISOString()
+    })
+  } finally {
+    quickSending.value = false
+  }
+}
+
+const resetQuickChat = () => {
+  quickLog.value = []
+  quickComposer.value = ''
+  quickStatus.value = 'idle'
+}
+
+const toggleMcp = async (server, action) => {
+  if (!server?.id) return
+  togglingMcpId.value = server.id
+  message.value = ''
+  try {
+    const endpoint = action === 'start' ? 'start' : 'stop'
+    const res = await fetch(`${API_BASE}/mcp/servers/${server.id}/${endpoint}`, { method: 'POST' })
+    if (!res.ok) throw new Error(`Failed to ${endpoint} MCP`)
+    message.value = `MCP ${action}ed.`
+    await loadMcps()
+  } catch (error) {
+    console.error('Toggle MCP failed', error)
+    message.value = `MCP ${action} failed.`
+  } finally {
+    togglingMcpId.value = null
+  }
+}
+
+const goTo = (path) => {
+  router.push(path)
+}
+
+onMounted(() => {
+  refreshAll()
 })
 </script>
 
 <template>
-  <div class="relative min-h-screen">
-    <main class="relative z-10 mx-auto w-full max-w-none px-5 lg:px-10 py-10 space-y-8">
-      <header class="tui-surface rounded-xl border border-slate-200 p-6">
-        <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div class="space-y-2">
-            <p class="text-xs uppercase tracking-[0.32em] text-slate-500">z.ai admin</p>
-            <h1 class="text-3xl font-bold text-slate-900">RAG Control Dashboard</h1>
+  <div class="relative min-h-screen bg-white text-slate-900">
+    <main class="mx-auto w-full max-w-6xl px-2 py-4 space-y-0">
+      <header class="border border-slate-200 px-6 py-5">
+        <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div class="space-y-1">
+            <p class="text-xs uppercase tracking-[0.32em] text-slate-500">z.ai control</p>
+            <h1 class="text-3xl font-bold">Operations Dashboard</h1>
             <p class="text-sm text-slate-600">
-              Manage agents, MCP links, and active threads. Home routes to the latest status.
+              Live agent, MCP, and chat controls. Use this page to glance and act without leaving the shell vibe.
             </p>
-            <div class="flex flex-wrap items-center gap-2">
-              <TuiBadge variant="info">/api/v1</TuiBadge>
-            <TuiBadge variant="muted">base: dynamic (current host)</TuiBadge>
+            <div class="flex flex-wrap items-center gap-2 text-xs text-slate-600">
+              <span class="uppercase tracking-[0.22em]">/api/v1</span>
+              <span class="uppercase tracking-[0.22em] text-slate-500">base: {{ origin }}</span>
             </div>
           </div>
-          <div class="flex flex-wrap items-center gap-3">
-            <router-link to="/agents">
-              <TuiButton size="sm">Agent management</TuiButton>
-            </router-link>
-            <router-link to="/mcps">
-              <TuiButton size="sm" variant="outline">MCP management</TuiButton>
-            </router-link>
-            <router-link to="/chat">
-              <TuiButton size="sm" variant="outline">Chat tester</TuiButton>
-            </router-link>
-            <router-link to="/components">
-              <TuiButton size="sm" variant="outline">component library</TuiButton>
-            </router-link>
+          <div class="flex flex-wrap items-center gap-2">
+            <TuiButton size="sm" variant="outline" @click="refreshAll">refresh</TuiButton>
+            <TuiButton size="sm" variant="ghost" @click="goTo('/agents')">agents</TuiButton>
+            <TuiButton size="sm" variant="ghost" @click="goTo('/mcps')">mcps</TuiButton>
+            <TuiButton size="sm" variant="ghost" @click="goTo('/settings')">settings</TuiButton>
           </div>
         </div>
       </header>
 
-      <section class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <div class="tui-surface rounded-lg border border-slate-200 px-4 py-3">
-          <p class="text-xs uppercase tracking-[0.26em] text-slate-500">agents online</p>
-          <div class="mt-2 flex items-baseline gap-2">
-            <span class="text-3xl font-bold text-slate-900">{{ totalAgents.toString().padStart(2, '0') }}</span>
-            <span class="text-sm text-slate-600">managed</span>
-          </div>
+      <section class="grid grid-cols-1 border border-slate-200 text-[11px] uppercase tracking-[0.16em] text-slate-600 md:grid-cols-4">
+        <div class="border-b border-slate-200 px-5 py-4 md:border-b-0 md:border-r">
+          Agents: {{ metrics.totalAgents }} ({{ metrics.readyAgents }} ready)
         </div>
-        <div class="tui-surface rounded-lg border border-slate-200 px-4 py-3">
-          <p class="text-xs uppercase tracking-[0.26em] text-slate-500">active threads</p>
-          <div class="mt-2 flex items-baseline gap-2">
-            <span class="text-3xl font-bold text-slate-900">{{ activeThreadsCount.toString().padStart(2, '0') }}</span>
-            <span class="text-sm text-slate-600">last 10</span>
-          </div>
+        <div class="border-b border-slate-200 px-5 py-4 md:border-b-0 md:border-r">
+          Tokens today: {{ formatTokens(metrics.tokensToday) }}
         </div>
-        <div class="tui-surface rounded-lg border border-slate-200 px-4 py-3">
-          <p class="text-xs uppercase tracking-[0.26em] text-slate-500">tokens today</p>
-          <div class="mt-2 flex items-baseline gap-2">
-            <span class="text-3xl font-bold text-slate-900">{{ formatTokens(totalTokensToday) }}</span>
-            <span class="text-sm text-slate-600">sum</span>
-          </div>
+        <div class="border-b border-slate-200 px-5 py-4 md:border-b-0 md:border-r">
+          MCPs: {{ metrics.mcps }} running: {{ metrics.runningMcps }}
         </div>
-        <div class="tui-surface rounded-lg border border-slate-200 px-4 py-3">
-          <p class="text-xs uppercase tracking-[0.26em] text-slate-500">api base</p>
-          <div class="mt-2 flex items-baseline gap-2">
-            <span class="text-3xl font-bold text-slate-900">/api</span>
-            <span class="text-sm text-slate-600">v1</span>
-          </div>
-          <p class="mt-1 text-xs text-slate-600">Uses current host for API calls.</p>
+        <div class="px-5 py-4">
+          Health: API {{ health?.api_status || '—' }} / DB {{ health?.database_status?.ok ? 'ok' : 'check' }}
         </div>
       </section>
 
-      <section class="grid gap-6 xl:grid-cols-[2fr_1.1fr]">
-        <div class="tui-surface rounded-xl border border-slate-200 p-5">
-          <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <section class="grid lg:grid-cols-[1.15fr_1fr]">
+        <div class="border border-slate-200 px-6 py-5">
+          <div class="flex items-center justify-between">
             <div>
-              <p class="text-xs uppercase tracking-[0.24em] text-slate-500">agents</p>
-              <h2 class="text-xl font-semibold text-slate-900">Status & Usage</h2>
+              <p class="text-[11px] uppercase tracking-[0.2em] text-slate-500">Agent</p>
+              <h2 class="text-2xl font-semibold">Status & Usage</h2>
             </div>
-            <div class="flex items-center gap-2 text-xs text-slate-700">
-              <span class="h-2 w-2 rounded-full bg-slate-900"></span>
-              live sync
+            <div class="flex items-center gap-2 text-xs text-slate-600">
+              <span v-if="agentError">{{ agentError }}</span>
+              <TuiButton size="sm" variant="outline" @click="loadAgents">refresh</TuiButton>
             </div>
           </div>
-          <div class="mt-4 space-y-2 text-xs text-slate-600" v-if="agentError">
-            {{ agentError }}
-          </div>
-          <div v-if="isLoadingAgents" class="mt-6 text-sm text-slate-600">Loading agents...</div>
-          <div v-else class="mt-4 divide-y divide-slate-200">
+          <div v-if="isLoadingAgents" class="text-sm text-slate-600 py-4">Loading agents...</div>
+          <div v-else-if="!agents.length" class="text-sm text-slate-600 py-4">No agents found. Create one from Agent Management.</div>
+          <div v-else class="divide-y divide-slate-200">
             <div
-              v-for="agent in agents"
+              v-for="agent in topAgents"
               :key="agent.id"
-              class="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between"
+              class="grid gap-3 py-4 sm:grid-cols-[auto_1fr_auto] sm:items-center"
             >
               <div class="flex items-center gap-3">
-                <div class="h-10 w-10 rounded-md border border-slate-300 bg-white text-center text-sm font-semibold leading-10 uppercase text-slate-800">
+                <div class="h-10 w-10 border border-slate-300 bg-white text-center text-sm font-semibold leading-10 uppercase text-slate-800">
                   {{ agent.name.slice(0, 2) }}
                 </div>
                 <div>
-                  <p class="text-base font-semibold text-slate-900">{{ agent.name }}</p>
-                  <p class="text-sm text-slate-600">{{ agent.model }}</p>
+                  <p class="text-base font-semibold leading-tight">{{ agent.name }}</p>
+                  <p class="text-[11px] uppercase tracking-[0.16em] text-slate-500">{{ agent.model }}</p>
                 </div>
               </div>
-              <div class="grid w-full grid-cols-2 gap-4 text-sm text-slate-700 sm:w-auto sm:grid-cols-3 sm:items-center">
+              <div class="grid grid-cols-2 gap-3 text-sm text-slate-700 sm:grid-cols-3">
                 <div>
                   <p class="text-[11px] uppercase tracking-[0.18em] text-slate-500">tokens today</p>
-                  <p class="font-semibold">{{ formatTokens(agent.tokenCountToday) }}</p>
+                  <p class="font-semibold tabular-nums">{{ formatTokens(agent.tokenCountToday) }}</p>
                 </div>
                 <div>
                   <p class="text-[11px] uppercase tracking-[0.18em] text-slate-500">last active</p>
-                  <p class="font-semibold">{{ agent.lastActive || '—' }}</p>
+                  <p class="font-semibold tabular-nums">{{ agent.lastActive || '—' }}</p>
                 </div>
-                <TuiBadge :variant="statusVariant(agent.status)" class="w-24 justify-center">
-                  {{ agent.status || 'ready' }}
-                </TuiBadge>
+                <div class="flex items-center">
+                  <TuiBadge :variant="statusVariant(agent.status)" class="w-24 justify-center">
+                    {{ agent.status || 'ready' }}
+                  </TuiBadge>
+                </div>
               </div>
-            </div>
-            <div v-if="!agents.length" class="py-6 text-sm text-slate-600">
-              No agents found. Create one from Agent Management.
+              <div class="flex flex-wrap justify-start gap-2 sm:justify-end">
+                <router-link :to="`/chat/${agent.id}`">
+                  <TuiButton size="sm" variant="ghost">chat</TuiButton>
+                </router-link>
+                <router-link to="/agents">
+                  <TuiButton size="sm" variant="outline">manage</TuiButton>
+                </router-link>
+                <router-link :to="`/tester/${agent.id}`">
+                  <TuiButton size="sm" variant="ghost">tester</TuiButton>
+                </router-link>
+              </div>
             </div>
           </div>
         </div>
 
-        <div class="space-y-6">
-          <div class="tui-surface rounded-xl border border-slate-200 p-5">
-            <div class="flex items-center justify-between">
-              <div>
-                <p class="text-xs uppercase tracking-[0.24em] text-slate-500">threads</p>
-                <h2 class="text-xl font-semibold text-slate-900">Last 10 Active</h2>
-              </div>
-              <router-link to="/threads" class="text-xs uppercase tracking-[0.2em] text-slate-600 hover:text-slate-800">
-                manage threads
-              </router-link>
+        <div class="border border-slate-200 px-6 py-5">
+          <div class="flex items-center justify-between">
+            <div>
+              <p class="text-[11px] uppercase tracking-[0.2em] text-slate-500">Quick Chat</p>
+              <h3 class="text-xl font-semibold">Smoke Test</h3>
             </div>
-            <div class="mt-3 space-y-2 text-xs text-slate-600" v-if="threadError">
-              {{ threadError }}
-            </div>
-            <div v-if="isLoadingThreads" class="mt-6 text-sm text-slate-600">Loading threads...</div>
-            <div v-else class="mt-4 space-y-3">
-              <div
-                v-for="thread in lastActiveThreads"
-                :key="thread.id"
-                class="rounded-lg border border-slate-200 px-4 py-3"
-              >
-                <div class="flex items-center justify-between gap-3">
-                  <p class="text-base font-semibold text-slate-900">{{ thread.title }}</p>
-                  <TuiBadge :variant="statusVariant(thread.status)" class="w-24 justify-center">
-                    {{ thread.status }}
-                  </TuiBadge>
-                </div>
-                <p class="text-sm text-slate-600">Agent: {{ thread.agent }}</p>
-                <div class="mt-2 flex flex-wrap items-center gap-4 text-xs text-slate-700">
-                  <span>Tokens: {{ formatTokens(thread.tokensUsed) }}</span>
-                  <span>Last active: {{ thread.lastActive }}</span>
-                </div>
-              </div>
-              <div v-if="!lastActiveThreads.length" class="rounded-lg border border-dashed border-slate-300 px-4 py-3 text-sm text-slate-600">
-                No active threads yet.
+            <TuiBadge :variant="statusVariant(quickStatus)">state: {{ quickStatus }}</TuiBadge>
+          </div>
+          <TuiSelect
+            label="Agent"
+            :options="agentOptions"
+            v-model="quickAgentId"
+            placeholder="Select agent"
+          />
+          <div class="border border-slate-200 p-3 max-h-56 overflow-y-auto">
+            <p v-if="!quickLog.length" class="text-xs text-slate-600">Messages will appear here.</p>
+            <div v-else class="space-y-2">
+              <div v-for="(entry, idx) in quickLog" :key="idx" class="text-sm leading-relaxed">
+                <p class="text-[10px] uppercase tracking-[0.2em] text-slate-500">
+                  {{ entry.role }} — {{ new Date(entry.ts).toLocaleTimeString() }}
+                </p>
+                <p class="whitespace-pre-wrap text-slate-800">{{ entry.text }}</p>
               </div>
             </div>
           </div>
+          <label class="flex flex-col gap-2 text-sm text-slate-800">
+            <span class="text-[11px] uppercase tracking-[0.2em] text-slate-600">message</span>
+            <textarea
+              v-model="quickComposer"
+              rows="3"
+              :disabled="quickSending || !quickAgentId"
+              placeholder="Ping the agent without leaving the dashboard."
+              class="w-full border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-200 disabled:cursor-not-allowed disabled:bg-slate-100"
+            ></textarea>
+          </label>
+          <div class="flex flex-wrap items-center gap-2">
+            <TuiButton :loading="quickSending" @click="sendQuickMessage" :disabled="quickSending || !quickAgentId">
+              send
+            </TuiButton>
+            <TuiButton variant="outline" size="sm" @click="resetQuickChat">reset</TuiButton>
+          </div>
+        </div>
+      </section>
 
-          <div class="tui-surface rounded-xl border border-slate-200 p-5">
-            <div class="flex items-center justify-between">
-              <div>
-                <p class="text-xs uppercase tracking-[0.24em] text-slate-500">api status</p>
-                <h2 class="text-xl font-semibold text-slate-900">Signals</h2>
+      <section class="grid lg:grid-cols-[1.1fr_1fr]">
+        <div class="border border-slate-200 px-6 py-5">
+          <div class="flex items-center justify-between">
+            <div>
+              <p class="text-[11px] uppercase tracking-[0.2em] text-slate-500">MCP Servers</p>
+              <h3 class="text-xl font-semibold">Runtime</h3>
+            </div>
+            <div class="flex items-center gap-2 text-xs text-slate-600">
+              <span v-if="mcpError">{{ mcpError }}</span>
+              <TuiButton size="sm" variant="outline" @click="loadMcps">refresh</TuiButton>
+            </div>
+          </div>
+          <div v-if="isLoadingMcps" class="text-sm text-slate-600 py-4">Loading MCP servers...</div>
+          <div v-else-if="!mcps.length" class="text-sm text-slate-600 py-4">No MCP servers registered yet.</div>
+          <div v-else class="divide-y divide-slate-200">
+            <div
+              v-for="server in mcps"
+              :key="server.id"
+              class="grid gap-3 py-3 sm:grid-cols-[1fr_auto_auto] sm:items-center"
+            >
+              <div class="space-y-1">
+                <p class="text-base font-semibold">{{ server.name }}</p>
+                <p class="text-xs text-slate-600 break-all">{{ server.endpoint }}</p>
+                <p v-if="server.last_error" class="text-xs text-red-500">error: {{ server.last_error }}</p>
+                <p v-if="server.last_heartbeat" class="text-xs text-slate-500">last beat: {{ server.last_heartbeat }}</p>
               </div>
-              <TuiBadge variant="muted">/api/v1</TuiBadge>
+              <div class="flex items-center justify-start sm:justify-end">
+                <TuiBadge :variant="statusVariant(server.status)" class="w-28 justify-center">
+                  {{ server.status }}
+                </TuiBadge>
+              </div>
+              <div class="flex flex-wrap justify-start gap-2 sm:justify-end">
+                <TuiButton
+                  size="sm"
+                  variant="outline"
+                  :loading="togglingMcpId === server.id"
+                  @click="toggleMcp(server, 'start')"
+                >
+                  start
+                </TuiButton>
+                <TuiButton
+                  size="sm"
+                  variant="ghost"
+                  class="text-red-600"
+                  :loading="togglingMcpId === server.id"
+                  @click="toggleMcp(server, 'stop')"
+                >
+                  stop
+                </TuiButton>
+              </div>
             </div>
-            <div class="mt-4 space-y-3 text-sm text-slate-700">
-              <p class="flex items-center gap-2">
-                <span class="h-2 w-2 rounded-full bg-slate-900"></span>
-                Dashboard is wired to the current host (no localhost hardcoding).
-              </p>
-              <p class="flex items-center gap-2">
-                <span class="h-2 w-2 rounded-full bg-slate-500"></span>
-                Agents fetch from `/agents/`; threads fetch from `/threads`.
-              </p>
-              <p class="flex items-center gap-2">
-                <span class="h-2 w-2 rounded-full bg-slate-300"></span>
-                Fallback data renders when API is unreachable.
-              </p>
-            </div>
+          </div>
+        </div>
+
+        <div class="border border-slate-200 px-6 py-5">
+          <div>
+            <p class="text-[11px] uppercase tracking-[0.2em] text-slate-500">Health</p>
+            <p v-if="isLoadingHealth" class="text-sm text-slate-600">Checking health...</p>
+            <p v-else class="text-sm text-slate-700">
+              API: {{ health?.api_status || 'unknown' }} | DB: {{ health?.database_status?.message || '—' }}
+            </p>
+          </div>
+          <div class="text-sm text-slate-700">
+            <p class="text-[11px] uppercase tracking-[0.2em] text-slate-500">Recent</p>
+            <p class="mt-1">
+              {{ message || 'Use quick chat or MCP controls to populate this space.' }}
+            </p>
+          </div>
+          <div class="text-xs text-slate-600 space-y-1">
+            <p><strong>Agents</strong>: GET /agents/</p>
+            <p><strong>MCP</strong>: GET /mcp/servers</p>
+            <p><strong>Chat</strong>: POST /chat/</p>
+            <p><strong>Health</strong>: GET /health</p>
           </div>
         </div>
       </section>

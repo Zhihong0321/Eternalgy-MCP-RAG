@@ -21,14 +21,14 @@ const props = defineProps({
 })
 
 const base =
-  'relative overflow-hidden inline-flex items-center justify-center gap-2 rounded-md border font-semibold uppercase tracking-[0.18em] transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-900/5 active:translate-y-[1px] active:shadow-[0_6px_18px_rgba(15,23,42,0.15)] select-none'
+  'relative overflow-hidden inline-flex items-center justify-center gap-2 rounded-none border font-semibold uppercase tracking-[0.18em] transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[rgba(31,31,31,0.08)] active:translate-y-[1px] select-none'
 
 const variants = {
   primary:
-    'border-slate-900 bg-slate-900 text-white hover:bg-slate-800 active:bg-slate-700',
+    'border-[#ff8200] bg-[#ff8200] text-white hover:bg-[#e87400] active:bg-[#d96b00]',
   outline:
-    'border-slate-400 bg-white text-slate-900 hover:bg-slate-100 active:bg-slate-200',
-  ghost: 'border-transparent bg-transparent text-slate-800 hover:bg-slate-100 active:bg-slate-200'
+    'border-[var(--border-strong)] bg-white text-[var(--text)] hover:bg-[var(--accent-soft)] active:bg-[var(--accent-soft)]',
+  ghost: 'border-transparent bg-transparent text-[var(--text)] hover:bg-[rgba(0,0,0,0.04)] active:bg-[rgba(0,0,0,0.06)]'
 }
 
 const sizes = {
