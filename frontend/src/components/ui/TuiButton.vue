@@ -21,7 +21,7 @@ const props = defineProps({
 })
 
 const base =
-  'relative overflow-hidden inline-flex items-center justify-center gap-2 rounded-none border font-semibold uppercase tracking-[0.18em] transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[rgba(31,31,31,0.08)] active:translate-y-[1px] select-none'
+  'relative overflow-hidden inline-flex items-center justify-center gap-2 rounded-md border font-semibold uppercase tracking-wider transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[rgba(31,31,31,0.08)] active:translate-y-[1px] select-none'
 
 const variants = {
   primary:
@@ -32,9 +32,9 @@ const variants = {
 }
 
 const sizes = {
-  sm: 'px-3 py-2 text-[11px]',
-  md: 'px-4 py-2.5 text-xs',
-  lg: 'px-5 py-3 text-sm'
+  sm: 'px-3 py-2 text-xs',
+  md: 'px-4 py-2 text-sm',
+  lg: 'px-5 py-3 text-base'
 }
 
 const classes = computed(() => [

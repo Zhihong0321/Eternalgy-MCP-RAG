@@ -26,15 +26,15 @@ const onInput = (event) => {
 <template>
   <label class="flex flex-col gap-2 text-sm text-[var(--text)]">
     <div class="flex items-center justify-between">
-      <span class="text-[11px] uppercase tracking-[0.2em] text-[var(--muted)]">{{ label }}</span>
-      <span v-if="hint" class="text-[11px] text-[var(--muted)]">{{ hint }}</span>
+      <span class="text-xs uppercase tracking-wider text-[var(--muted)]">{{ label }}</span>
+      <span v-if="hint" class="text-xs text-[var(--muted)]">{{ hint }}</span>
     </div>
     <div class="breathing-ring">
       <input
         :type="type"
         :value="modelValue"
         :placeholder="placeholder"
-        class="w-full rounded-none border border-[var(--border-strong)] bg-white px-3 py-2 text-[var(--text)] focus:border-[var(--text)] focus:outline-none focus:ring-2 focus:ring-[rgba(31,31,31,0.12)]"
+        class="w-full rounded-md border border-[var(--border-strong)] bg-white px-3 py-2 text-[var(--text)] focus:border-[var(--text)] focus:outline-none focus:ring-2 focus:ring-[rgba(31,31,31,0.12)]"
         @input="onInput"
       />
     </div>
@@ -44,7 +44,7 @@ const onInput = (event) => {
 <style scoped>
 .breathing-ring {
   position: relative;
-  border-radius: 0;
+  border-radius: inherit;
 }
 
 .breathing-ring::after {

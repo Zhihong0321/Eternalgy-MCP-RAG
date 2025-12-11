@@ -222,18 +222,18 @@ onMounted(() => {
 
 <template>
   <div class="relative min-h-screen bg-white text-slate-900">
-    <main class="mx-auto w-full max-w-6xl px-2 py-4 space-y-0">
-      <header class="border border-slate-200 px-6 py-5">
+    <main class="mx-auto w-full max-w-6xl px-4 py-8">
+      <header class="mb-8">
         <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div class="space-y-1">
-            <p class="text-xs uppercase tracking-[0.32em] text-slate-500">z.ai control</p>
+            <p class="text-xs uppercase tracking-wider text-slate-500">z.ai control</p>
             <h1 class="text-3xl font-bold">Operations Dashboard</h1>
             <p class="text-sm text-slate-600">
               Live agent, MCP, and chat controls. Use this page to glance and act without leaving the shell vibe.
             </p>
-            <div class="flex flex-wrap items-center gap-2 text-xs text-slate-600">
-              <span class="uppercase tracking-[0.22em]">/api/v1</span>
-              <span class="uppercase tracking-[0.22em] text-slate-500">base: {{ origin }}</span>
+            <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-600">
+              <span class="uppercase tracking-wider">/api/v1</span>
+              <span class="uppercase tracking-wider text-slate-500">base: {{ origin }}</span>
             </div>
           </div>
           <div class="flex flex-wrap items-center gap-2">
@@ -245,7 +245,7 @@ onMounted(() => {
         </div>
       </header>
 
-      <section class="grid grid-cols-1 border border-slate-200 text-[11px] uppercase tracking-[0.16em] text-slate-600 md:grid-cols-4">
+      <section class="grid grid-cols-1 rounded-lg border border-slate-200 text-xs uppercase tracking-wider text-slate-600 md:grid-cols-4 mb-8">
         <div class="border-b border-slate-200 px-5 py-4 md:border-b-0 md:border-r">
           Agents: {{ metrics.totalAgents }} ({{ metrics.readyAgents }} ready)
         </div>
@@ -260,128 +260,106 @@ onMounted(() => {
         </div>
       </section>
 
-      <section class="grid lg:grid-cols-[1.15fr_1fr]">
-        <div class="border border-slate-200 px-6 py-5">
-          <div class="flex items-center justify-between">
-            <div>
-              <p class="text-[11px] uppercase tracking-[0.2em] text-slate-500">Agent</p>
-              <h2 class="text-2xl font-semibold">Status & Usage</h2>
-            </div>
-            <div class="flex items-center gap-2 text-xs text-slate-600">
-              <span v-if="agentError">{{ agentError }}</span>
-              <TuiButton size="sm" variant="outline" @click="loadAgents">refresh</TuiButton>
-            </div>
-          </div>
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <TuiCard title="Status & Usage" subtitle="Agent">
+          <template #actions>
+            <span v-if="agentError" class="text-xs text-red-500">{{ agentError }}</span>
+            <TuiButton size="sm" variant="outline" @click="loadAgents" :loading="isLoadingAgents">refresh</TuiButton>
+          </template>
           <div v-if="isLoadingAgents" class="text-sm text-slate-600 py-4">Loading agents...</div>
           <div v-else-if="!agents.length" class="text-sm text-slate-600 py-4">No agents found. Create one from Agent Management.</div>
-          <div v-else class="divide-y divide-slate-200">
+          <div v-else class="divide-y divide-slate-100 -mx-5">
             <div
               v-for="agent in topAgents"
               :key="agent.id"
-              class="grid gap-3 py-4 sm:grid-cols-[auto_1fr_auto] sm:items-center"
+              class="grid gap-4 px-5 py-4 sm:grid-cols-[auto_1fr_auto] sm:items-center"
             >
               <div class="flex items-center gap-3">
-                <div class="h-10 w-10 border border-slate-300 bg-white text-center text-sm font-semibold leading-10 uppercase text-slate-800">
+                <div class="flex h-10 w-10 items-center justify-center rounded-md border border-slate-200 bg-slate-50 text-sm font-semibold uppercase text-slate-800">
                   {{ agent.name.slice(0, 2) }}
                 </div>
                 <div>
                   <p class="text-base font-semibold leading-tight">{{ agent.name }}</p>
-                  <p class="text-[11px] uppercase tracking-[0.16em] text-slate-500">{{ agent.model }}</p>
+                  <p class="text-xs uppercase tracking-wider text-slate-500">{{ agent.model }}</p>
                 </div>
               </div>
-              <div class="grid grid-cols-2 gap-3 text-sm text-slate-700 sm:grid-cols-3">
+              <div class="grid grid-cols-3 gap-3 text-sm text-slate-700">
                 <div>
-                  <p class="text-[11px] uppercase tracking-[0.18em] text-slate-500">tokens today</p>
+                  <p class="text-xs uppercase tracking-wider text-slate-500">tokens</p>
                   <p class="font-semibold tabular-nums">{{ formatTokens(agent.tokenCountToday) }}</p>
                 </div>
                 <div>
-                  <p class="text-[11px] uppercase tracking-[0.18em] text-slate-500">last active</p>
+                  <p class="text-xs uppercase tracking-wider text-slate-500">active</p>
                   <p class="font-semibold tabular-nums">{{ agent.lastActive || '—' }}</p>
                 </div>
                 <div class="flex items-center">
-                  <TuiBadge :variant="statusVariant(agent.status)" class="w-24 justify-center">
+                  <TuiBadge :variant="statusVariant(agent.status)" class="w-full justify-center">
                     {{ agent.status || 'ready' }}
                   </TuiBadge>
                 </div>
               </div>
               <div class="flex flex-wrap justify-start gap-2 sm:justify-end">
-                <router-link :to="`/chat/${agent.id}`">
-                  <TuiButton size="sm" variant="ghost">chat</TuiButton>
-                </router-link>
-                <router-link to="/agents">
-                  <TuiButton size="sm" variant="outline">manage</TuiButton>
-                </router-link>
-                <router-link :to="`/tester/${agent.id}`">
-                  <TuiButton size="sm" variant="ghost">tester</TuiButton>
-                </router-link>
+                <TuiButton size="sm" variant="ghost" @click="goTo(`/chat/${agent.id}`)">chat</TuiButton>
+                <TuiButton size="sm" variant="outline" @click="goTo('/agents')">manage</TuiButton>
+                <TuiButton size="sm" variant="ghost" @click="goTo(`/tester/${agent.id}`)">tester</TuiButton>
               </div>
             </div>
           </div>
-        </div>
+        </TuiCard>
 
-        <div class="border border-slate-200 px-6 py-5">
-          <div class="flex items-center justify-between">
-            <div>
-              <p class="text-[11px] uppercase tracking-[0.2em] text-slate-500">Quick Chat</p>
-              <h3 class="text-xl font-semibold">Smoke Test</h3>
-            </div>
+        <TuiCard title="Smoke Test" subtitle="Quick Chat">
+          <template #actions>
             <TuiBadge :variant="statusVariant(quickStatus)">state: {{ quickStatus }}</TuiBadge>
-          </div>
-          <TuiSelect
-            label="Agent"
-            :options="agentOptions"
-            v-model="quickAgentId"
-            placeholder="Select agent"
-          />
-          <div class="border border-slate-200 p-3 max-h-56 overflow-y-auto">
-            <p v-if="!quickLog.length" class="text-xs text-slate-600">Messages will appear here.</p>
-            <div v-else class="space-y-2">
-              <div v-for="(entry, idx) in quickLog" :key="idx" class="text-sm leading-relaxed">
-                <p class="text-[10px] uppercase tracking-[0.2em] text-slate-500">
-                  {{ entry.role }} — {{ new Date(entry.ts).toLocaleTimeString() }}
-                </p>
-                <p class="whitespace-pre-wrap text-slate-800">{{ entry.text }}</p>
+          </template>
+          <div class="space-y-4">
+            <TuiSelect
+              label="Agent"
+              :options="agentOptions"
+              v-model="quickAgentId"
+              placeholder="Select agent"
+            />
+            <div class="border rounded-md border-slate-200 p-3 h-48 overflow-y-auto">
+              <p v-if="!quickLog.length" class="text-xs text-slate-500">Messages will appear here.</p>
+              <div v-else class="space-y-3">
+                <div v-for="(entry, idx) in quickLog" :key="idx" class="text-sm leading-relaxed">
+                  <p class="text-xs uppercase tracking-wider text-slate-500">
+                    {{ entry.role }} — {{ new Date(entry.ts).toLocaleTimeString() }}
+                  </p>
+                  <p class="whitespace-pre-wrap text-slate-800">{{ entry.text }}</p>
+                </div>
               </div>
             </div>
+            <div class="space-y-2">
+               <label class="text-xs uppercase tracking-wider text-slate-600">message</label>
+              <textarea
+                v-model="quickComposer"
+                rows="3"
+                :disabled="quickSending || !quickAgentId"
+                placeholder="Ping the agent without leaving the dashboard."
+                class="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-200 disabled:cursor-not-allowed disabled:bg-slate-100"
+              ></textarea>
+            </div>
+            <div class="flex flex-wrap items-center gap-2">
+              <TuiButton :loading="quickSending" @click="sendQuickMessage" :disabled="quickSending || !quickAgentId">
+                send
+              </TuiButton>
+              <TuiButton variant="outline" size="sm" @click="resetQuickChat">reset</TuiButton>
+            </div>
           </div>
-          <label class="flex flex-col gap-2 text-sm text-slate-800">
-            <span class="text-[11px] uppercase tracking-[0.2em] text-slate-600">message</span>
-            <textarea
-              v-model="quickComposer"
-              rows="3"
-              :disabled="quickSending || !quickAgentId"
-              placeholder="Ping the agent without leaving the dashboard."
-              class="w-full border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-200 disabled:cursor-not-allowed disabled:bg-slate-100"
-            ></textarea>
-          </label>
-          <div class="flex flex-wrap items-center gap-2">
-            <TuiButton :loading="quickSending" @click="sendQuickMessage" :disabled="quickSending || !quickAgentId">
-              send
-            </TuiButton>
-            <TuiButton variant="outline" size="sm" @click="resetQuickChat">reset</TuiButton>
-          </div>
-        </div>
-      </section>
+        </TuiCard>
 
-      <section class="grid lg:grid-cols-[1.1fr_1fr]">
-        <div class="border border-slate-200 px-6 py-5">
-          <div class="flex items-center justify-between">
-            <div>
-              <p class="text-[11px] uppercase tracking-[0.2em] text-slate-500">MCP Servers</p>
-              <h3 class="text-xl font-semibold">Runtime</h3>
-            </div>
-            <div class="flex items-center gap-2 text-xs text-slate-600">
-              <span v-if="mcpError">{{ mcpError }}</span>
-              <TuiButton size="sm" variant="outline" @click="loadMcps">refresh</TuiButton>
-            </div>
-          </div>
+        <TuiCard title="Runtime" subtitle="MCP Servers">
+          <template #actions>
+            <span v-if="mcpError" class="text-xs text-red-500">{{ mcpError }}</span>
+            <TuiButton size="sm" variant="outline" @click="loadMcps" :loading="isLoadingMcps">refresh</TuiButton>
+          </template>
           <div v-if="isLoadingMcps" class="text-sm text-slate-600 py-4">Loading MCP servers...</div>
           <div v-else-if="!mcps.length" class="text-sm text-slate-600 py-4">No MCP servers registered yet.</div>
-          <div v-else class="divide-y divide-slate-200">
+          <div v-else class="divide-y divide-slate-100 -mx-5">
             <div
               v-for="server in mcps"
               :key="server.id"
-              class="grid gap-3 py-3 sm:grid-cols-[1fr_auto_auto] sm:items-center"
+              class="grid gap-3 px-5 py-3 sm:grid-cols-[1fr_auto_auto] sm:items-center"
             >
               <div class="space-y-1">
                 <p class="text-base font-semibold">{{ server.name }}</p>
@@ -406,7 +384,7 @@ onMounted(() => {
                 <TuiButton
                   size="sm"
                   variant="ghost"
-                  class="text-red-600"
+                  class="text-red-600 hover:bg-red-50"
                   :loading="togglingMcpId === server.id"
                   @click="toggleMcp(server, 'stop')"
                 >
@@ -415,30 +393,32 @@ onMounted(() => {
               </div>
             </div>
           </div>
-        </div>
+        </TuiCard>
 
-        <div class="border border-slate-200 px-6 py-5">
-          <div>
-            <p class="text-[11px] uppercase tracking-[0.2em] text-slate-500">Health</p>
-            <p v-if="isLoadingHealth" class="text-sm text-slate-600">Checking health...</p>
-            <p v-else class="text-sm text-slate-700">
-              API: {{ health?.api_status || 'unknown' }} | DB: {{ health?.database_status?.message || '—' }}
-            </p>
+        <TuiCard title="Health & Vitals" subtitle="System">
+          <div class="space-y-4">
+            <div v-if="isLoadingHealth" class="text-sm text-slate-600">Checking health...</div>
+            <div v-else class="text-sm text-slate-700 space-y-1">
+              <p><strong>API:</strong> {{ health?.api_status || 'unknown' }}</p>
+              <p><strong>DB:</strong> {{ health?.database_status?.message || '—' }}</p>
+            </div>
+            <div class="space-y-1">
+              <p class="text-xs uppercase tracking-wider text-slate-500">Recent Events</p>
+              <p class="mt-1 text-sm text-slate-600 min-h-[3em]">
+                {{ message || 'Use quick chat or MCP controls to populate this space.' }}
+              </p>
+            </div>
+            <div class="space-y-2 text-xs text-slate-600">
+              <p class="text-xs uppercase tracking-wider text-slate-500">API Endpoints</p>
+              <p><strong>Agents</strong>: GET /agents/</p>
+              <p><strong>MCP</strong>: GET /mcp/servers</p>
+              <p><strong>Chat</strong>: POST /chat/</p>
+              <p><strong>Health</strong>: GET /health</p>
+            </div>
           </div>
-          <div class="text-sm text-slate-700">
-            <p class="text-[11px] uppercase tracking-[0.2em] text-slate-500">Recent</p>
-            <p class="mt-1">
-              {{ message || 'Use quick chat or MCP controls to populate this space.' }}
-            </p>
-          </div>
-          <div class="text-xs text-slate-600 space-y-1">
-            <p><strong>Agents</strong>: GET /agents/</p>
-            <p><strong>MCP</strong>: GET /mcp/servers</p>
-            <p><strong>Chat</strong>: POST /chat/</p>
-            <p><strong>Health</strong>: GET /health</p>
-          </div>
-        </div>
-      </section>
+        </TuiCard>
+      </div>
     </main>
   </div>
 </template>
+

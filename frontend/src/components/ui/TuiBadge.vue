@@ -20,7 +20,7 @@ const variants = {
 }
 
 const classes = computed(() => [
-  'inline-flex items-center gap-2 rounded-none border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.18em]',
+  'inline-flex items-center gap-2 rounded-md border px-2.5 py-1 text-xs font-semibold uppercase tracking-wider',
   variants[props.variant] || variants.muted
 ])
 </script>

@@ -30,12 +30,12 @@ const onChange = (event) => {
 <template>
   <label class="flex flex-col gap-2 text-sm text-[var(--text)]">
     <div class="flex items-center justify-between">
-      <span class="text-[11px] uppercase tracking-[0.2em] text-[var(--muted)]">{{ label }}</span>
-      <span v-if="hint" class="text-[11px] text-[var(--muted)]">{{ hint }}</span>
+      <span class="text-xs uppercase tracking-wider text-[var(--muted)]">{{ label }}</span>
+      <span v-if="hint" class="text-xs text-[var(--muted)]">{{ hint }}</span>
     </div>
     <div class="relative breathing-ring">
       <select
-        class="w-full appearance-none rounded-none border border-[var(--border-strong)] bg-white px-3 py-2 pr-9 text-[var(--text)] focus:border-[var(--text)] focus:outline-none focus:ring-2 focus:ring-[rgba(31,31,31,0.1)]"
+        class="w-full appearance-none rounded-md border border-[var(--border-strong)] bg-white px-3 py-2 pr-9 text-[var(--text)] focus:border-[var(--text)] focus:outline-none focus:ring-2 focus:ring-[rgba(31,31,31,0.1)]"
         :value="modelValue"
         @change="onChange"
       >
@@ -45,7 +45,7 @@ const onChange = (event) => {
         </option>
       </select>
       <span
-        class="pointer-events-none absolute inset-y-0 right-3 flex items-center text-slate-500 transition"
+        class="pointer-events-none absolute inset-y-0 right-3 flex items-center text-[var(--muted)] transition"
         :class="hasValue ? 'opacity-80' : 'opacity-60'"
       >
         ▾
@@ -57,7 +57,7 @@ const onChange = (event) => {
 <style scoped>
 .breathing-ring {
   position: relative;
-  border-radius: 0;
+  border-radius: inherit;
 }
 
 .breathing-ring::after {
