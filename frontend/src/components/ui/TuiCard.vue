@@ -6,7 +6,7 @@ const props = defineProps({
 </script>
 
 <template>
-  <div class="border-b border-slate-200 py-6">
+  <div class="border-b border-slate-200 px-5 py-6">
     <header v-if="title || subtitle" class="mb-4 flex items-start justify-between gap-3">
       <div class="space-y-1">
         <p v-if="subtitle" class="text-xs uppercase tracking-wider text-slate-500">

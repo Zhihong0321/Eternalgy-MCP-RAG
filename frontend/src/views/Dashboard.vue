@@ -267,42 +267,39 @@ onMounted(() => {
             <TuiButton size="sm" variant="outline" @click="loadAgents" :loading="isLoadingAgents">refresh</TuiButton>
           </template>
           <div v-if="isLoadingAgents" class="text-sm text-slate-600 py-4">Loading agents...</div>
-          <div v-else class="divide-y divide-slate-100">
+          <div v-else class="divide-y divide-slate-200">
             <div
               v-for="agent in topAgents"
               :key="agent.id"
               class="flex flex-wrap items-center justify-between gap-4 px-5 py-4"
             >
-              <div class="flex flex-wrap items-center gap-x-6 gap-y-3">
-                <div class="flex items-center gap-3">
-                  <div class="flex h-10 w-10 items-center justify-center rounded-md border border-slate-200 bg-slate-50 text-sm font-semibold uppercase text-slate-800">
-                    {{ agent.name.slice(0, 2) }}
-                  </div>
-                  <div>
-                    <p class="text-base font-semibold leading-tight">{{ agent.name }}</p>
-                    <p class="text-xs uppercase tracking-wider text-slate-500">{{ agent.model }}</p>
-                  </div>
+              <div class="flex min-w-0 flex-1 items-center gap-4">
+                <div class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-md border border-slate-200 bg-slate-50 text-sm font-semibold uppercase text-slate-800">
+                  {{ agent.name.slice(0, 2) }}
                 </div>
-                <div class="grid grid-cols-3 gap-3 text-sm text-slate-700">
-                  <div>
-                    <p class="text-xs uppercase tracking-wider text-slate-500">tokens</p>
-                    <p class="font-semibold tabular-nums">{{ formatTokens(agent.tokenCountToday) }}</p>
-                  </div>
-                  <div>
-                    <p class="text-xs uppercase tracking-wider text-slate-500">active</p>
-                    <p class="font-semibold tabular-nums">{{ agent.lastActive || '—' }}</p>
-                  </div>
-                  <div class="flex items-center">
-                    <TuiBadge :variant="statusVariant(agent.status)" class="w-full justify-center">
-                      {{ agent.status || 'ready' }}
-                    </TuiBadge>
-                  </div>
+                <div class="min-w-0 flex-1">
+                  <p class="truncate text-base font-semibold leading-tight">{{ agent.name }}</p>
+                  <p class="truncate text-xs uppercase tracking-wider text-slate-500">{{ agent.model }}</p>
                 </div>
               </div>
-              <div class="flex flex-wrap justify-start gap-2 sm:justify-end">
+
+              <div class="hidden items-center gap-3 text-sm text-slate-700 sm:flex">
+                <div class="text-center">
+                  <p class="text-xs uppercase tracking-wider text-slate-500">tokens</p>
+                  <p class="font-semibold tabular-nums">{{ formatTokens(agent.tokenCountToday) }}</p>
+                </div>
+                <div class="text-center">
+                  <p class="text-xs uppercase tracking-wider text-slate-500">active</p>
+                  <p class="font-semibold tabular-nums">{{ agent.lastActive || '—' }}</p>
+                </div>
+                <TuiBadge :variant="statusVariant(agent.status)" class="w-24 justify-center">
+                  {{ agent.status || 'ready' }}
+                </TuiBadge>
+              </div>
+
+              <div class="flex flex-wrap justify-start gap-2">
                 <TuiButton size="sm" variant="ghost" @click="goTo(`/chat/${agent.id}`)">chat</TuiButton>
                 <TuiButton size="sm" variant="outline" @click="goTo('/agents')">manage</TuiButton>
-                <TuiButton size="sm" variant="ghost" @click="goTo(`/tester/${agent.id}`)">tester</TuiButton>
               </div>
             </div>
           </div>
@@ -341,7 +338,7 @@ onMounted(() => {
               ></textarea>
             </div>
             <div class="flex flex-wrap items-center gap-2">
-              <TuiButton :loading="quickSending" @click="sendQuickMessage" :disabled="quickSending || !quickAgentId">
+              <TuiButton size="sm" :loading="quickSending" @click="sendQuickMessage" :disabled="quickSending || !quickAgentId">
                 send
               </TuiButton>
               <TuiButton variant="outline" size="sm" @click="resetQuickChat">reset</TuiButton>
@@ -356,28 +353,22 @@ onMounted(() => {
           </template>
           <div v-if="isLoadingMcps" class="text-sm text-slate-600 py-4">Loading MCP servers...</div>
           <div v-else-if="!mcps.length" class="text-sm text-slate-600 py-4">No MCP servers registered yet.</div>
-          <div v-else class="divide-y divide-slate-100">
+          <div v-else class="divide-y divide-slate-200">
             <div
               v-for="server in mcps"
               :key="server.id"
               class="flex flex-wrap items-center justify-between gap-4 px-5 py-3"
             >
-              <div class="flex flex-wrap items-center gap-x-6 gap-y-3">
-                <div class="space-y-1">
-                  <p class="text-base font-semibold">{{ server.name }}</p>
-                  <p class="text-xs text-slate-600 break-all">{{ server.endpoint }}</p>
-                  <p v-if="server.last_error" class="text-xs text-red-500">error: {{ server.last_error }}</p>
-                  <p v-if="server.last_heartbeat" class="text-xs text-slate-500">
-                    last beat: {{ server.last_heartbeat }}
-                  </p>
+              <div class="flex min-w-0 flex-1 items-center gap-4">
+                <div class="min-w-0 flex-1">
+                  <p class="truncate text-base font-semibold">{{ server.name }}</p>
+                  <p class="truncate text-xs text-slate-600">{{ server.endpoint }}</p>
                 </div>
-                <div class="flex items-center justify-start sm:justify-end">
-                  <TuiBadge :variant="statusVariant(server.status)" class="w-28 justify-center">
-                    {{ server.status }}
-                  </TuiBadge>
-                </div>
+                <TuiBadge :variant="statusVariant(server.status)" class="w-24 flex-shrink-0 justify-center">
+                  {{ server.status }}
+                </TuiBadge>
               </div>
-              <div class="flex flex-wrap justify-start gap-2 sm:justify-end">
+              <div class="flex flex-wrap justify-start gap-2">
                 <TuiButton
                   size="sm"
                   variant="outline"
