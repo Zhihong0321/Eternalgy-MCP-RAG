@@ -6,20 +6,20 @@ const props = defineProps({
 </script>
 
 <template>
-  <section class="tui-surface rounded-lg border border-[var(--border)] p-5">
+  <div class="border-b border-slate-200 py-6">
     <header v-if="title || subtitle" class="mb-4 flex items-start justify-between gap-3">
       <div class="space-y-1">
-        <p v-if="subtitle" class="text-xs uppercase tracking-wider text-[var(--muted)]">
+        <p v-if="subtitle" class="text-xs uppercase tracking-wider text-slate-500">
           {{ subtitle }}
         </p>
-        <h3 v-if="title" class="text-lg font-semibold text-[var(--text)]">{{ title }}</h3>
+        <h3 v-if="title" class="text-lg font-semibold text-slate-900">{{ title }}</h3>
       </div>
-      <div>
+      <div class="flex items-center gap-2">
         <slot name="actions" />
       </div>
     </header>
     <div>
       <slot />
     </div>
-  </section>
+  </div>
 </template>
